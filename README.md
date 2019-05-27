@@ -2,7 +2,7 @@
 python scripts to display radar imagery from wdss-ii (also known as wdss2) netcdf files.
 http://www.wdssii.org/
 
-Description of each file
+
 
 wdss_file_process.py
 ---------------------
