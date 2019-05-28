@@ -79,8 +79,7 @@ def plot_set():
             'weight' : 'bold',
             'size'   : 20}
     plt.titlesize : 24
-    plt.labelsize : 20
-    plt.grid()
+    plt.labelsize : 16
     #plt.linewidth : 3
     #lines.markersize : 10
     #xtick.labelsize : 16
@@ -88,7 +87,7 @@ def plot_set():
     mpl.rc('font', **font)
     plt.xlim(-85.5,-84.9)
     plt.ylim(42.2,42.8)
-    #plt.axis('off')
+    plt.axis('off')
     return
 
 def make_cmap(colors, position=None, bit=False):
@@ -175,7 +174,7 @@ from datetime import datetime,timezone
 from matplotlib.colors import LinearSegmentedColormap
 
 #-------- Begin creating custom color maps --------
-sw_colors = [(0,0,0),(220,220,255),(180,180,240),(50,50,150),(1,1,0),(1,150,0),(1,0,0),(1,1,1)]
+sw_colors = [(0,0,0),(220,220,255),(180,180,240),(50,50,150),(255,255,0),(255,150,0),(255,0,0),(255,255,255)]
 sw_position = [0, 1/40, 5/40, 0.25, 15/40, 0.5, 0.75, 1]
 sw_cmap=make_cmap(sw_colors, position=sw_position,bit=True)
 plt.register_cmap(cmap=sw_cmap)
@@ -212,6 +211,18 @@ azdone = False
 
 srcDir = 'C:/data/wdss-ii/stage099'
 file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(srcDir)) for f in fn]
+
+
+test = ['AZ','DV','VG','Z','V','SW']
+#test = ['Z','V','SW']
+
+subplots = {'1':{'start':111,'plot_size':(7,7)},'2':{'start':121,'plot_size':(14,8)},
+               '3':{'start':131,'plot_size':(21,8)},'4':{'start':221,'plot_size':(14,14)},
+               '5':{'start':221,'plot_size':(21,14)},'6':{'start':231,'plot_size':(23,14)}}
+
+sp_start = subplots[str(len(test))]['start']
+pl_size = subplots[str(len(test))]['plot_size']
+    
 
 # A very big assumption here is that the 'file_list' listing is in chronological order
 # This seems to work when running the fileList script first, because that script
@@ -259,49 +270,34 @@ for next_file in file_list:
     refl_lat,refl_lon,refl_back=latlon_from_radar('Reflectivity',azimuths,degrees_tilt)
 
     # Check if arrays were created for all products to be plotted
-    # This whole plotting thing needs to be much more robust
-    # It's currently hard-wired to 6 panes and needs other stuff added
-    # such as user defined # of panes, color bars, maps, ticks, etc.
+    # Added functionality to plot a variety of pane layouts
+    # Color bars added, still need to work on maps and grids
+    
     if (vgdone and divdone and veldone and swdone and refdone and azdone):
-        plt.figure(figsize=(21,14))
+
+        plts = {'V':{'lat':lat,'lon':lon,'ar':np_vel,'cmap':v_cmap,'vmn':-50,'vmx':50,'title':'Velocity','cbticks':[-40,-30,-20,-10,0,10,20,30,40],'cblabel':'kts'},
+                'Z':{'lat':refl_lat,'lon':refl_lon,'ar':np_ref,'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'},
+                'AZ':{'lat':lat,'lon':lon,'ar':np_az,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'AzShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
+                'DV':{'lat':lat,'lon':lon,'ar':np_div,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'DivShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
+                'SW':{'lat':lat,'lon':lon,'ar':np_sw,'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'},
+                'VG':{'lat':lat,'lon':lon,'ar':np_vg,'cmap':vg_cmap,'vmn':0.001,'vmx':0.025,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}}
+
+        plt.figure(figsize=pl_size)
         plt.suptitle(t_str + '\n' + cut_str + ' Degrees')
-        #title_end = str(degree_cut) + ' Degrees ' + t_str
-        
-        plt.subplot(231)
-        plot_set()
-        plt.title('AzShear')
-        plt.pcolormesh(lat,lon,np_az,cmap=azdv_cmap,vmin=-0.02, vmax=0.02)
-        
-        plt.subplot(232)
-        plot_set()
-        plt.title('DivShear')
-        plt.pcolormesh(lat,lon,np_div,cmap=azdv_cmap,vmin=-0.02, vmax=0.02)
-        
-        plt.subplot(233)
-        plot_set()
-        plt.title('Velocity Gradient')
-        plt.pcolormesh(lat,lon,np_vg,cmap=vg_cmap,vmin=0.001, vmax=0.025)
-        
-        
-        plt.subplot(236)
-        plot_set()
-        plt.title('Spectrum Width')
-        plt.pcolormesh(lat,lon,np_sw,cmap=sw_cmap,vmin=0,vmax=40)
-        
-        
-        plt.subplot(235)
-        plot_set()
-        plt.title('Velocity')
-        plt.pcolormesh(lat,lon,np_vel,cmap=v_cmap,vmin=-50.0,vmax=50.0)
-        #plt.colorbar()
-        
-        plt.subplot(234)
-        plot_set()
-        plt.title('Reflectivity')
-        plt.pcolormesh(refl_lat,refl_lon,np_ref,cmap=ref_cmap,vmin=-30,vmax=80)
-        
-        #plt.colorbar()
-        image_dst_path = 'C:/data/wdss-ii/python-images/' + image_fname
+
+        for num, p in enumerate(test,start=sp_start):
+            plt.subplot(num)
+            plot_set()
+            plt.title(plts[p]['title'])
+            plt.pcolormesh(plts[p]['lat'],plts[p]['lon'],plts[p]['ar'],cmap=plts[p]['cmap'],vmin=plts[p]['vmn'], vmax=plts[p]['vmx'])
+            im = plt.pcolormesh(plts[p]['lat'],plts[p]['lon'],plts[p]['ar'],cmap=plts[p]['cmap'],vmin=plts[p]['vmn'], vmax=plts[p]['vmx'])
+            cbar = plt.colorbar(im)
+            cbar.ax.tick_params(labelsize=14)
+            #cbar.ax.set_yticklabels(plts[p]['cbticks'])
+            cbar.set_label(plts[p]['cblabel'])
+
+        #image_fname = 'test.png'
+        image_dst_path = 'C:/data/scripts/wdss/' + image_fname
         plt.savefig(image_dst_path,format='png')
         plt.show()
         #reset these for the next image creation pass
