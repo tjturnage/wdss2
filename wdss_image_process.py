@@ -11,24 +11,26 @@ Last updated: 26 May 2019
 
 """ 
 
-def latlon_from_radar(product,az,elevation):
+def latlon_from_radar(az,elevation,num_gates):
     """
     Convert radar bin radial coordinates to lat/lon coordinates.
     Adapted from Brian Blaylock code
     
     Parameters
     ----------
-     product : string (examples: 'Reflectivity', 'DivShear_Storm', etc.)
-               Needed to determine if Reflecticty is the product because
-               the number of Reflectivity range gates changes with elevation
           az : numpy array
                All the radials for that particular product and elevation
                Changes from 720 radials for super-res product cuts to 360 radials
    elevation : float
-               The radar elevation slice in degrees. Needed to:
-               - determine and assign the number of range gates for Reflectivity
-               - calculate range gate length (gate_len) as projected on the ground
-        
+               The radar elevation slice in degrees. Needed to calculate range 
+               gate length (gate_len) as projected on the ground using simple
+               trigonometry. This is a very crude approximation that doesn't
+               factor for terrain, earth's curvature, or for standard beam refraction.
+   num_gates : integer
+               The number of gates in a radial, which varies with 
+               elevation and radar product. That is why each product makes 
+               an individual call to this function. 
+                    
     Returns
     -------
          lat : array like
@@ -39,56 +41,15 @@ def latlon_from_radar(product,az,elevation):
     rng = None
     factor = math.cos(math.radians(elevation))
     gate_len = 250.0 * factor
-    if product == 'Reflectivity':
-        if elevation < 1.0:
-            rng = np.arange(2125.0,(1832*gate_len + 2125.0),gate_len)
-        elif elevation < 1.5:
-            rng = np.arange(2125.0,(1712*gate_len + 2125.0),gate_len)
-        elif elevation < 2.0:
-            rng = np.arange(2125.0,(1540*gate_len + 2125.0),gate_len)
-        else:
-            rng = np.arange(2125.0,(1336*gate_len + 2125.0),gate_len)   
+    rng = np.arange(2125.0,(num_gates*gate_len + 2125.0),gate_len)
+    g = Geod(ellps='clrk66')
+    center_lat = np.ones([len(az),len(rng)])*dnew2.Latitude
+    center_lon = np.ones([len(az),len(rng)])*dnew2.Longitude
+    az2D = np.ones_like(center_lat)*az[:,None]
+    rng2D = np.ones_like(center_lat)*np.transpose(rng[:,None])
+    lat,lon,back=g.fwd(center_lon,center_lat,az2D,rng2D)
+    return lat,lon,back
 
-        g = Geod(ellps='clrk66')
-        center_lat = np.ones([len(az),len(rng)])*dnew2.Latitude
-        center_lon = np.ones([len(az),len(rng)])*dnew2.Longitude
-        az2D = np.ones_like(center_lat)*az[:,None]
-        rng2D = np.ones_like(center_lat)*np.transpose(rng[:,None])
-        lat,lon,back=g.fwd(center_lon,center_lat,az2D,rng2D)
-        return lat,lon,back
-    else:
-        rng = np.arange(2125.0,(1192*gate_len + 2125.0),gate_len)
-        g = Geod(ellps='clrk66')
-        center_lat = np.ones([len(az),len(rng)])*dnew2.Latitude
-        center_lon = np.ones([len(az),len(rng)])*dnew2.Longitude
-        az2D = np.ones_like(center_lat)*az[:,None]
-        rng2D = np.ones_like(center_lat)*np.transpose(rng[:,None])
-        lat,lon,back=g.fwd(center_lon,center_lat,az2D,rng2D)
-        return lat,lon,back
-    
-
-def plot_set():
-    """
-    Returns nothing, just sets the matplotlib plot environment 
-    for consistency among image panes.
-    Includes font/axes settings and defines plot display domain
-
-    Future work: take input xlim,ylim values for feature following zoom    
-    """
-    font = {'family' : 'normal',
-            'weight' : 'bold',
-            'size'   : 20}
-    plt.titlesize : 24
-    plt.labelsize : 16
-    #plt.linewidth : 3
-    #lines.markersize : 10
-    #xtick.labelsize : 16
-    #ytick.labelsize : 16
-    mpl.rc('font', **font)
-    plt.xlim(-85.5,-84.9)
-    plt.ylim(42.2,42.8)
-    plt.axis('off')
-    return
 
 def make_cmap(colors, position=None, bit=False):
     """
@@ -160,12 +121,53 @@ def radar_cut_time(t):
     #image_fname = img_fname_tstr + '_' + newcut + '.png'
     return fig_title_timestring,fig_filename_timestring
 
+def plot_set():
+    """
+    Returns nothing, just sets the matplotlib plot environment 
+    for consistency among image panes. Includes font/axes settings
+    and defines plot display domain.
+
+    Future work: take input xlim,ylim values for feature following zoom    
+    """
+    font = {'family' : 'normal',
+            'weight' : 'normal',
+            'size'   : 20}
+    plt.titlesize : 24
+    plt.labelsize : 16
+
+    #plt.linewidth : 3
+    #lines.markersize : 10
+    plt.tick_params(labelsize=12)
+    mpl.rc('font', **font)
+    plt.xlim(-97.0,-95.0)
+    plt.ylim(46.5,48.5)
+    #plt(sharex=True)
+    #plt(sharey=True)
+    #plt.plot(42.53,-85.17,'r+',zorder=10)
+    #plt.axis('off')
+    return
+
+def round_to(n, precision):
+    """
+    Currently not using, but plan to implement to get useful
+    lat/lon grid ticks by rounding to every half degree
+    """
+    correction = 0.5 if n >= 0 else -0.5
+    return int( n/precision+correction ) * precision
+
+def round_to_point5(n):
+    """
+    Currently not using, but plan to implement to get useful
+    lat/lon grid ticks by rounding to every half degree
+    """
+    return round_to(n, 0.5)
+
 from pyproj import Geod
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import cartopy
+import cartopy as ccrs
 import os
 import math
 import sys
@@ -209,7 +211,8 @@ swdone = False
 refdone = False
 azdone = False
 
-srcDir = 'C:/data/wdss-ii/stage099'
+srcDir = 'C:/data/wdss-ii/stage/20180827_KMVX'
+dstDir = srcDir + '_images/'
 file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(srcDir)) for f in fn]
 
 
@@ -229,6 +232,7 @@ pl_size = subplots[str(len(test))]['plot_size']
 # creates new filenames beginning with their timestamps
 for next_file in file_list:
     data = None
+    num_gates = 0
     myFile = next_file
     data = xr.open_dataset(myFile)
     dtype = data.TypeName
@@ -241,33 +245,42 @@ for next_file in file_list:
     image_fname = img_fname_tstr + '_' + newcut + '.png'
     dnew2 = data.sortby('Azimuth')
     azimuths = dnew2.Azimuth.values
-    lat,lon,back=latlon_from_radar(dtype,azimuths,degrees_tilt)
+    num_gates = len(dnew2.Gate)
+    lat,lon,back=latlon_from_radar(azimuths,degrees_tilt,num_gates)
 
     if dtype == 'Velocity_Gradient_Storm':
         da = dnew2.Velocity_Gradient_Storm
+        vglat,vglon,vgback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_vg = da.to_masked_array(copy=True)
         vgdone = True
     elif dtype == 'DivShear_Storm':
         da = dnew2.DivShear_Storm
+        dvlat,dvlon,dvback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_div = da.to_masked_array(copy=True)
         divdone = True
     elif dtype == 'Velocity':
         da = dnew2.Velocity
+        vlat,vlon,vback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_vel = da.to_masked_array(copy=True)
         veldone = True
     elif dtype == 'SpectrumWidth':
         da = dnew2.SpectrumWidth
+        swlat,swlon,swback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_sw = da.to_masked_array(copy=True)
         swdone = True
     elif dtype == 'Reflectivity':
         da = dnew2.Reflectivity
+        reflat,reflon,refback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_ref = da.to_masked_array(copy=True)
         refdone = True
     elif dtype == 'AzShear_Storm':
         da = dnew2.AzShear_Storm
+        azlat,azlon,azback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_az = da.to_masked_array(copy=True)
         azdone = True
-    refl_lat,refl_lon,refl_back=latlon_from_radar('Reflectivity',azimuths,degrees_tilt)
+
+
+    #refl_lat,refl_lon,refl_back=latlon_from_radar('Reflectivity',azimuths,degrees_tilt)
 
     # Check if arrays were created for all products to be plotted
     # Added functionality to plot a variety of pane layouts
@@ -275,29 +288,35 @@ for next_file in file_list:
     
     if (vgdone and divdone and veldone and swdone and refdone and azdone):
 
-        plts = {'V':{'lat':lat,'lon':lon,'ar':np_vel,'cmap':v_cmap,'vmn':-50,'vmx':50,'title':'Velocity','cbticks':[-40,-30,-20,-10,0,10,20,30,40],'cblabel':'kts'},
-                'Z':{'lat':refl_lat,'lon':refl_lon,'ar':np_ref,'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'},
-                'AZ':{'lat':lat,'lon':lon,'ar':np_az,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'AzShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
-                'DV':{'lat':lat,'lon':lon,'ar':np_div,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'DivShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
-                'SW':{'lat':lat,'lon':lon,'ar':np_sw,'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'},
-                'VG':{'lat':lat,'lon':lon,'ar':np_vg,'cmap':vg_cmap,'vmn':0.001,'vmx':0.025,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}}
+        plts = {'V':{'lat':vlat,'lon':vlon,'ar':np_vel,'cmap':v_cmap,'vmn':-50,'vmx':50,'title':'Velocity','cbticks':[-40,-30,-20,-10,0,10,20,30,40],'cblabel':'kts'},
+                'Z':{'lat':reflat,'lon':reflon,'ar':np_ref,'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'},
+                'AZ':{'lat':azlat,'lon':azlon,'ar':np_az,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'AzShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
+                'DV':{'lat':dvlat,'lon':dvlon,'ar':np_div,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'DivShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
+                'SW':{'lat':swlat,'lon':swlon,'ar':np_sw,'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'},
+                'VG':{'lat':vglat,'lon':vglon,'ar':np_vg,'cmap':vg_cmap,'vmn':0.001,'vmx':0.025,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}}
 
         plt.figure(figsize=pl_size)
-        plt.suptitle(t_str + '\n' + cut_str + ' Degrees')
+        #ax = plt.axes(projection=ccrs.PlateCarree())
+        plt.suptitle(t_str + '\nKMVX ' + cut_str + ' Degrees')
 
         for num, p in enumerate(test,start=sp_start):
             plt.subplot(num)
             plot_set()
             plt.title(plts[p]['title'])
-            plt.pcolormesh(plts[p]['lat'],plts[p]['lon'],plts[p]['ar'],cmap=plts[p]['cmap'],vmin=plts[p]['vmn'], vmax=plts[p]['vmx'])
+            plt.plot(42.53,-85.17,'r+',zorder=10)
+            
+            #plt.plot([-85.17, 42.53], color='gray', linestyle='--',transform=ccrs.PlateCarree(),)
+            plt.pcolormesh(plts[p]['lat'],plts[p]['lon'],plts[p]['ar'],cmap=plts[p]['cmap'],vmin=plts[p]['vmn'], vmax=plts[p]['vmx'],zorder=1)
             im = plt.pcolormesh(plts[p]['lat'],plts[p]['lon'],plts[p]['ar'],cmap=plts[p]['cmap'],vmin=plts[p]['vmn'], vmax=plts[p]['vmx'])
+            #plt.plot([-85.17, 42.53], color='gray', linestyle='--',transform=ccrs.PlateCarree(),)
             cbar = plt.colorbar(im)
             cbar.ax.tick_params(labelsize=14)
             #cbar.ax.set_yticklabels(plts[p]['cbticks'])
             cbar.set_label(plts[p]['cblabel'])
 
+
         #image_fname = 'test.png'
-        image_dst_path = 'C:/data/scripts/wdss/' + image_fname
+        image_dst_path = dstDir + image_fname
         plt.savefig(image_dst_path,format='png')
         plt.show()
         #reset these for the next image creation pass
