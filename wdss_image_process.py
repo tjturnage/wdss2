@@ -139,8 +139,16 @@ def plot_set():
     #lines.markersize : 10
     plt.tick_params(labelsize=12)
     mpl.rc('font', **font)
-    plt.xlim(-97.0,-95.0)
-    plt.ylim(46.5,48.5)
+
+    xleft = -86.75
+    xright = xleft + 1.5
+    ydown = 43.0
+    yup = ydown + 1.5
+    
+    #xshift = -0.01
+    #yshift = 0.01    
+    plt.xlim(xleft,xright)
+    plt.ylim(ydown,yup)
     #plt(sharex=True)
     #plt(sharey=True)
     #plt.plot(42.53,-85.17,'r+',zorder=10)
@@ -161,6 +169,20 @@ def round_to_point5(n):
     lat/lon grid ticks by rounding to every half degree
     """
     return round_to(n, 0.5)
+
+def npsq(ar1,ar2):
+    """
+    input: two masked np arrays
+    takes the square root of the sum of the squares
+    velocity gradient = sqrt(azshear**2 + divshear**)
+    """
+    #ar1_f = ar1.filled(ar1)
+    #ar2_f = ar2.filled(ar2)
+    #ar_t1 = ar1_f[ar1_f > -100]
+    #ar_t2 = ar2_f[ar2_f > -100]
+    ar_sq = np.square(ar1) + np.square(ar2)
+    ar_final = np.sqrt(ar_sq)
+    return ar_final
 
 from pyproj import Geod
 import matplotlib as mpl
@@ -211,7 +233,7 @@ swdone = False
 refdone = False
 azdone = False
 
-srcDir = 'C:/data/wdss-ii/stage/20180827_KMVX'
+srcDir = 'C:/data/wdss-ii/stage/20080608_KGRR'
 dstDir = srcDir + '_images/'
 file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(srcDir)) for f in fn]
 
@@ -227,6 +249,7 @@ sp_start = subplots[str(len(test))]['start']
 pl_size = subplots[str(len(test))]['plot_size']
     
 
+swdone = True
 # A very big assumption here is that the 'file_list' listing is in chronological order
 # This seems to work when running the fileList script first, because that script
 # creates new filenames beginning with their timestamps
@@ -273,18 +296,22 @@ for next_file in file_list:
         reflat,reflon,refback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_ref = da.to_masked_array(copy=True)
         refdone = True
+    elif dtype == 'ReflectivityQC':
+        da = dnew2.ReflectivityQC
+        reflat,reflon,refback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
+        np_ref = da.to_masked_array(copy=True)
+        refdone = True
     elif dtype == 'AzShear_Storm':
         da = dnew2.AzShear_Storm
         azlat,azlon,azback=latlon_from_radar(azimuths,degrees_tilt,num_gates)
         np_az = da.to_masked_array(copy=True)
         azdone = True
+    else:
+        pass
 
-
-    #refl_lat,refl_lon,refl_back=latlon_from_radar('Reflectivity',azimuths,degrees_tilt)
-
-    # Check if arrays were created for all products to be plotted
-    # Added functionality to plot a variety of pane layouts
-    # Color bars added, still need to work on maps and grids
+    if (divdone and azdone):
+        np_vg_test = npsq(np_az,np_div)
+        
     
     if (vgdone and divdone and veldone and swdone and refdone and azdone):
 
@@ -293,11 +320,11 @@ for next_file in file_list:
                 'AZ':{'lat':azlat,'lon':azlon,'ar':np_az,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'AzShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
                 'DV':{'lat':dvlat,'lon':dvlon,'ar':np_div,'cmap':azdv_cmap,'vmn':-0.02,'vmx':0.02,'title':'DivShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'},
                 'SW':{'lat':swlat,'lon':swlon,'ar':np_sw,'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'},
-                'VG':{'lat':vglat,'lon':vglon,'ar':np_vg,'cmap':vg_cmap,'vmn':0.001,'vmx':0.025,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}}
+                'VG':{'lat':vglat,'lon':vglon,'ar':np_vg_test,'cmap':vg_cmap,'vmn':0.001,'vmx':0.025,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}}
 
         plt.figure(figsize=pl_size)
         #ax = plt.axes(projection=ccrs.PlateCarree())
-        plt.suptitle(t_str + '\nKMVX ' + cut_str + ' Degrees')
+        plt.suptitle(t_str + '\nKGRR ' + cut_str + ' Degrees')
 
         for num, p in enumerate(test,start=sp_start):
             plt.subplot(num)
@@ -323,7 +350,7 @@ for next_file in file_list:
         vgdone = False
         divdone = False
         veldone = False
-        swdone = False
+        #swdone = False
         refdone = False
         azdone = False
     else:
