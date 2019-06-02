@@ -25,7 +25,7 @@ def latlon_from_radar(az,elevation,num_gates):
                The radar elevation slice in degrees. Needed to calculate range 
                gate length (gate_len) as projected on the ground using simple
                trigonometry. This is a very crude approximation that doesn't
-               factor for terrain, earth's curvature, or for standard beam refraction.
+               factor for terrain, earth's curvature, or standard beam refraction.
    num_gates : integer
                The number of gates in a radial, which varies with 
                elevation and radar product. That is why each product makes 
@@ -106,14 +106,25 @@ def plot_set(plot_type):
 
 def npsq(ar1,ar2):
     """
-    input: two masked np arrays
-    takes the square root of the sum of the squares
-    velocity gradient = sqrt(azshear**2 + divshear**)
-    """
-
+    Creates an array that's the square root of the sum of squares
+    of 2 input arrays. This is to compute velocity gradient:
+        
+        velocity gradient = sqrt(azshear**2 + divshear**2)
+    
+    Parameters
+    ----------
+        ar1         :   numpy array (either masked or unmasked)
+        ar2         :   numpy array (either masked or unmasked)
+        
+    Returns
+    -------
+        ar_final    :   numpy array  
+                
+    """   
     ar_sq = np.square(ar1) + np.square(ar2)
     ar_final = np.sqrt(ar_sq)
     return ar_final
+
 
 from case_data import this_case 
 import matplotlib as mpl
