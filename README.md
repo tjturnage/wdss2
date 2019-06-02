@@ -1,8 +1,12 @@
 # wdss2
-python scripts to display radar imagery from wdss-ii (also known as wdss2) netcdf files.
-http://www.wdssii.org/
+python scripts to display radar imagery from netcdf files. The netcdf files first must be created with a separate 
+application called wdss-ii (also known as wdss2):
 
-Workflow generally goes in the following sequence 
+      http://www.wdssii.org/
+
+
+Workflow generally goes with the following sequence of scripts...
+
 
 case_data.py
 ---------------------
@@ -11,9 +15,9 @@ This is the best first step since it will ease workflow when subsequent scripts 
 
 wdss_create_netcdfs.py
 ---------------------
-Constructs commands to be passed to wdss-ii so it can generate netcdfs from radar files.
-Creating netcdfs is usually only a one time deal for each case, unless of course it's later
-determined that additional radar data files are desired.
+Constructs commands that are passed to wdss-ii so it can generate netcdfs from WSR-88D level 2 archive radar files.
+Creating netcdfs is usually only a one time deal for each case, unless of course you later decide 
+you want to process additional radar data.
 
 wdss_stage_files.py
 ---------------------
@@ -30,4 +34,3 @@ Imports custom_maps.py to get the color tables needed to render the maps.
 custom_maps.py
 ---------------------
 Color maps that are created and then imported into wdss_create_figures.py
-
