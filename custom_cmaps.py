@@ -3,7 +3,7 @@
 Creates custom cmaps for matplotlib
 https://matplotlib.org/3.1.0/tutorials/colors/colormap-manipulation.html
 
-Assumption: You'll import this into your master image creation script
+Assumption: You'll import the created cmaps into wdss_create_netcdfs.py
 
 author: thomas.turnage@noaa.gov
 Last updated: 28 May 2019
@@ -75,8 +75,9 @@ sw_cmap=make_cmap(sw_colors, position=sw_position,bit=True)
 plt.register_cmap(cmap=sw_cmap)
 
 #--- Velocity Gradient
-vg_colors = [(0, 0, 0),(30,30,30),(60,60,60),(110,70,0),(200,0,0),(1,1,1)]
-vg_position = [0, 1/15, 2/15, 7/15, 8/15, 1]
+vg_colors = [(0, 0, 0),(32,32,32),(128,128,128),(117,70,0),(151,70,0),(186,70,0),(220,132,0),(255,153,0),(119,0,0,),(153,0,0),(187,0,0),
+             (221,0,0),(255,0,0),(255,204,204),(255,204,255),(255,255,255),(255,255,255)]
+vg_position = [0, 1/15, 2/15, 3/15, 4/15, 5/15, 6/15, 7/15, 8/15, 9/15, 10/15, 11/15, 12/15, 13/15, 14/15, 0.999999, 1 ]
 vg_cmap=make_cmap(vg_colors, position=vg_position,bit=True)
 plt.register_cmap(cmap=vg_cmap)
 
@@ -87,13 +88,12 @@ ref_cmap=make_cmap(ref_colors, position=ref_position,bit=True)
 plt.register_cmap(cmap=ref_cmap)
 
 #--- Azimuthal Shear / Div Shear
-#azdv_colors = [(0,0,0),(1,1,1),(1,0,0),(0.7,0,0),(0,0,0),(0,0,0.7),(0,0,1),(1,1,1),(0,0,0)]
-azdv_colors = [(0,0,0),(1,1,1),(0,0,1),(0,0,0.7),(0,0,0),(0.7,0,0),(1,0,0),(1,1,1),(0,0,0)]
-azdv_position = [0, 0.1, 0.3, 0.43, 0.5, 0.57, 0.7, 0.9, 1]
+azdv_colors = [(1,1,1),(1,1,1),(0,0,1),(0,0,0.7),(0,0,0),(0.7,0,0),(1,0,0),(1,1,1),(1,1,1)]
+azdv_position = [0, 0.001, 0.3, 0.43, 0.5, 0.57, 0.7, 0.999, 1]
 azdv_cmap=make_cmap(azdv_colors, position=azdv_position)
 plt.register_cmap(cmap=azdv_cmap)
 
-#--- Velocity - need to home grow this so I don't require metpy
+#--- Velocity - need to home grow this so I don't require import from metpy
 v_norm, v_cmap = colortables.get_with_range('NWS8bitVel', -40, 40)
 v_cmap.set_under('k')
 plt.register_cmap(cmap=v_cmap)
