@@ -19,7 +19,7 @@ Constructs commands that are passed to wdss-ii so it can generate netcdfs from W
 Creating netcdfs is usually only a one time deal for each case, unless of course you later decide 
 you want to process additional radar data.
 
-Note: importing case metadata from case_data.py doesn't seem to work here (because of using os.cmd ??).
+Note: importing case metadata from case_data.py doesn't seem to work here (because of using os.system ??).
       Therefore am hard-wiring required arguments into script instead.
 
 wdss_stage_files.py
