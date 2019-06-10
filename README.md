@@ -17,8 +17,10 @@ wdss_create_netcdfs.py
 ---------------------
 Constructs commands that are passed to wdss-ii so it can generate netcdfs from WSR-88D level 2 archive radar files.
 Creating netcdfs is usually only a one time deal for each case, unless of course you later decide 
-you want to process additional radar data. Not having success importing this_case from "case_data.py" to run this,
-possibly because of using os.cmd ... so am hard-wiring arguments instead.
+you want to process additional radar data.
+
+Note: importing case metadata from case_data.py doesn't seem to work here (because of using os.cmd ??).
+      Therefore am hard-wiring required arguments into script instead.
 
 wdss_stage_files.py
 ---------------------
