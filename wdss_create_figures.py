@@ -62,8 +62,8 @@ def srv(velocity_data_array,storm_dir,storm_speed):
     Subtracts storm motion from velocity bin values. This is based on the cosine of the angle
     between the storm direction and a given array radial direction.
     
-    torm_dir=250 and storm_speed=30 >> 
-              storm motion from 250 degrees at 30 knots...
+    Storm_dir=250 and storm_speed=30 >> 
+             storm motion from 250 degrees at 30 knots...
 
              adds up to 30 kts      (at array's  70 degree radial)
              subtracts up to 30 kts (at array's 250 degree radial)
@@ -71,22 +71,24 @@ def srv(velocity_data_array,storm_dir,storm_speed):
     
     Parameters
     ----------
-  velocity_data_array : xarray
-                        velocity array that will be recalculated
-            storm_dir : float
-                        storm motion direction in compass degrees
-          storm_speed : integer or float
-                        storm speed in knots
+    velocity_data_array : xarray
+                          velocity array that will be recalculated
+              storm_dir : float
+                          storm motion direction in compass degrees
+            storm_speed : integer or float
+                          storm speed in knots
                     
     Returns
     -------
-        Nothing - just saves the new array
+    Nothing - just adds new array to arDict
                     
     """
     da_new_speed = velocity_data_array
-    # since storm motion is given as a "from" direction, have to flip
-    # this 180 degrees (i.e., pi radians) to be consistent with radial "to" direction
+    # Storm motion is given as a "from" direction, so have to flip
+    # this 180 degrees (equal to "pi" radians) to be consistent with
+    # radial "to" direction convention
     storm_dir = math.radians(storm_dir) - math.pi
+
     for a in range(0,len(da_vel.Azimuth)):
         angle = math.radians(da_vel.Azimuth.values[a]) - storm_dir
         factor = math.cos(angle) * storm_speed
@@ -473,7 +475,7 @@ for filename in files:
 
     if azdone and divdone:
         if (dv_shape == az_shape):
-            #velocity gradient = square root of (divshear**2 + azshear**2)
+            # Velocity Gradient equals square root of (divshear**2 + azshear**2)
             ar_sq = np.square(dv_fill) + np.square(az_fill)
             vg_arr = np.sqrt(ar_sq)
             arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
