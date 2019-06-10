@@ -6,7 +6,14 @@ WDSS-II information : http://www.wdssii.org/
 Assumption: You previously ran wdss_stage_files.py to prep the netcdf file
 
 author: thomas.turnage@noaa.gov
-Last updated: 26 May 2019
+   Last updated : 10 Jun 2019
+
+   New features:
+            srv : function to create Storm Relative Velocity (SRV)
+     make_ticks : function to create lat/lon ticks for an extent
+        windows : Boolean - toggles betweeen running on windows vs. linux
+
+        simpler way to call state shapefiles to add to maps
 ------------------------------------------------
 
 """ 
@@ -50,6 +57,45 @@ def latlon_from_radar(az,elevation,num_gates):
     lat,lon,back=g.fwd(center_lon,center_lat,az2D,rng2D)
     return lat,lon,back
 
+def srv(velocity_data_array,storm_dir,storm_speed):
+    """
+    Subtracts storm motion from velocity bin values. This is based on the cosine of the angle
+    between the storm direction and a given array radial direction.
+    
+    torm_dir=250 and storm_speed=30 >> 
+              storm motion from 250 degrees at 30 knots...
+
+             adds up to 30 kts      (at array's  70 degree radial)
+             subtracts up to 30 kts (at array's 250 degree radial)
+             
+    
+    Parameters
+    ----------
+  velocity_data_array : xarray
+                        velocity array that will be recalculated
+            storm_dir : float
+                        storm motion direction in compass degrees
+          storm_speed : integer or float
+                        storm speed in knots
+                    
+    Returns
+    -------
+        Nothing - just saves the new array
+                    
+    """
+    da_new_speed = velocity_data_array
+    # since storm motion is given as a "from" direction, have to flip
+    # this 180 degrees (i.e., pi radians) to be consistent with radial "to" direction
+    storm_dir = math.radians(storm_dir) - math.pi
+    for a in range(0,len(da_vel.Azimuth)):
+        angle = math.radians(da_vel.Azimuth.values[a]) - storm_dir
+        factor = math.cos(angle) * storm_speed
+        da_new_speed[a] = da_new_speed[a] - factor 
+
+    new_speed_arr = da_new_speed.to_masked_array(copy=True)
+    arDict['SRV'] = {'ar':new_speed_arr,'lat':srv_lats,'lon':srv_lons}
+    return
+
 
 def radar_cut_time(t):
     """
@@ -58,12 +104,12 @@ def radar_cut_time(t):
     
     Parameters
     ----------
-         t : integer
+    t : integer
         
     Returns
     -------
-         fig_title_timestring    : 'DD Mon YYYY  -  HH:MM:SS UTC'  
-         fig_filename_timestring : 'YYYYMMDD-HHMMSS'
+    fig_title_timestring    : 'DD Mon YYYY  -  HH:MM:SS UTC'  
+    fig_filename_timestring : 'YYYYMMDD-HHMMSS'
                     
     """    
     newt = datetime.fromtimestamp(t, timezone.utc)
@@ -71,72 +117,149 @@ def radar_cut_time(t):
     fig_filename_timestring = datetime.strftime(newt, "%Y%m%d-%H%M%S")
     return fig_title_timestring,fig_filename_timestring
 
-def plot_set(plot_type):
+
+def calc_dlatlon_dt(starting_coords,starting_time,ending_coords,ending_time):
     """
-    Returns nothing, just sets the matplotlib plot environment 
-    for consistency among image panes. Includes font/axes settings
-    and defines plot display domain. Much of this could get imported
-    with case_data.py in the future
-
-    Future work: take input xlim,ylim values for feature following zoom    
-    """
-    if plot_type == 'single':
-        font = {'weight' : 'normal',
-                'size'   : 10}
-        plt.titlesize : 16
-        plt.labelsize : 8
-    else:
-        font = {'weight' : 'normal',
-                'size'   : 12}
-        plt.titlesize : 20
-        plt.labelsize : 8
-
-    plt.tick_params(labelsize=8)
-    mpl.rc('font', **font)
-
-
-    ymin = this_case['latmin']
-    ymax = this_case['latmax']
-    xmin = this_case['lonmin']
-    xmax = this_case['lonmax']
-  
-    plt.xlim(xmin,xmax)
-    plt.ylim(ymin,ymax)
-    return
-
-def npsq(ar1,ar2):
-    """
-    Creates an array that's the square root of the sum of squares
-    of 2 input arrays. This is to compute velocity gradient:
-        
-        velocity gradient = sqrt(azshear**2 + divshear**2)
+    One-time calculation of changes in latitude and longitude with respect to time
+    to implement feature-following zoom. Radar plotting software should be used
+    beforehand to track a feature's lat/lon position at two different scan times
+    along with the two different scan times.
+    
+    This needs to be executed only at the beginning since dlat_dt and dlon_dt should
+    remain constant.
+    
     
     Parameters
     ----------
-        ar1         :   numpy array (either masked or unmasked)
-        ar2         :   numpy array (either masked or unmasked)
-        
+    starting_coords : tuple containing two floats - (lat,lon)
+                      Established with radar plotting software to determine
+                      starting coordinates for the feature of interest.
+
+      starting_time : string
+                      format - 'yyyy-mm-dd HH:MM:SS' - example - '2018-06-01 22:15:55'
+
+      ending_coords : tuple containing two floats - (lat,lon)
+                      Established with radar plotting software to determine
+                      starting coordinates for the feature of interest.
+
+        ending_time : string
+                      format - 'yyyy-mm-dd HH:MM:SS' - example - '2018-06-01 23:10:05'
+
+                                          
     Returns
     -------
-        ar_final    :   numpy array  
-                
-    """   
-    ar_sq = np.square(ar1) + np.square(ar2)
-    ar_final = np.sqrt(ar_sq)
-    return ar_final
+            dlat_dt : float
+                      Feature's movement measured in degrees latitude per second
+            dlon_dt : float
+                      Feature's movement measured in degrees longitude per second
+                    
+    """ 
+    starting_datetime = datetime.strptime(starting_time, "%Y-%m-%d %H:%M:%S")
+    ending_datetime = datetime.strptime(ending_time, "%Y-%m-%d %H:%M:%S")
+    dt =  ending_datetime - starting_datetime
+    dt_seconds = dt.seconds
+    print('dt_seconds --------- ' + str(dt_seconds))
+    dlat_dt = (ending_coords[0] - starting_coords[0])/dt_seconds
+    dlon_dt = (ending_coords[1] - starting_coords[1])/dt_seconds
+
+    return dlat_dt, dlon_dt
+    
+
+def make_ticks(this_min,this_max):
+    """
+    Determines range of tick marks to plot based on a provided range of degree coordinates.
+    This function is typically called by 'calc_new_extent' after that function has calculated
+    a new lat/lon extent for feature-following zoom.
+    
+    Parameters
+    ----------
+           this_min : float
+                      minimum value of either a lat or lon extent
+           this_max : float
+                      maximum value of either a lat or lon extent
+                                          
+    Returns
+    -------
+           tick_arr : array
+                      list of tick mark labels to use for plotting in the new extent
+
+    """
+
+    t_min = round(this_min) - 0.5
+    t_max = round(this_max) + 0.5
+    
+    t_init = np.arange(t_min,t_max,0.5)    
+    tick_arr = []
+    for t in range(0,len(t_init)):
+        if t_init[t] >= this_min and t_init[t] <= this_max:
+            tick_arr.append(t_init[t])
+        else:
+            pass
+    return tick_arr
 
 
+def calc_new_extent(orig_t,t,lon_rate,lat_rate):
+    """
+
+    Shifts the map domain with each image to emulate AWIPS feature following zoom.
+    Requires orig_extent [xmin,xmax,ymin,ymax] as a baseline to calculate new_extent
+
+    
+    Parameters
+    ----------
+             orig_t : integer
+                      Epoch time (seconds) of first radar product in loop
+
+                  t : integer
+                      Epoch time (seconds) of current radar product in loop
+
+           lon_rate : float
+                      Change of longitude per second wrt time
+                      determined ahead of time by 'calc_dlatlon_dt' function
+
+           lat_rate : float
+                      Change of latitude per second wrt time
+                      determined ahead of time by 'calc_dlatlon_dt' function
+
+      ending_coords : tuple containing two floats - (lat,lon)
+                      Established with radar plotting software to determine
+                      starting coordinates for the feature of interest.
+                                          
+    Returns
+    -------
+         new_extent : list of floats
+                      [min longitude, max longitude, min latitude, max latitude]
+
+             xticks : list of floats
+                      list of longitude ticks to plot
+
+             xticks : list of floats
+                      list of latitude ticks to plot
+                    
+    """    
+    time_shift = t - orig_t
+    lon_shift = time_shift * lon_rate
+    lat_shift = time_shift * lat_rate
+
+    new_xmin = xmin + lon_shift
+    new_xmax = xmax + lon_shift
+    new_ymin = ymin + lat_shift
+    new_ymax = ymax + lat_shift
+    new_extent = [new_xmin,new_xmax,new_ymin,new_ymax]
+    #call 'make_ticks' function to create ticks for new extent
+    x_ticks = make_ticks(new_xmin,new_xmax)
+    y_ticks = make_ticks(new_ymin,new_ymax)
+
+    return new_extent,x_ticks,y_ticks
+
+#import case_data
 from case_data import this_case 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import cartopy
-from cartopy.mpl.geoaxes import GeoAxes
-from mpl_toolkits.axes_grid1 import AxesGrid
 from custom_cmaps import sw_cmap,vg_cmap,ref_cmap,azdv_cmap,v_cmap
 from pyproj import Geod
 import numpy as np
 import xarray as xr
-#from cartopy import config
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.io.shapereader as shpreader
@@ -145,10 +268,25 @@ import os
 import math
 from datetime import datetime,timezone
 
-county_mi = '/data/GIS/counties/counties_mi/counties_MI.shp'
-reader = shpreader.Reader(county_mi)
-counties = list(reader.geometries())
-COUNTIES_MI = cfeature.ShapelyFeature(counties, ccrs.PlateCarree())
+#counties_list 
+base_gis_dir = '/data/GIS'
+for ST in ['MI']:
+    st = ST.lower()
+    counties_dir = 'counties_' + st
+    county_reader = 'county_' + st
+    counties_shape = 'counties_' + ST + '.shp'
+    COUNTIES_ST = 'COUNTIES_' + ST
+    counties_shape_path = os.path.join(base_gis_dir,counties_dir,counties_shape)
+
+    county_reader = counties_shape_path
+    reader = shpreader.Reader(counties_shape_path)
+    counties = list(reader.geometries())
+    COUNTIES_ST = cfeature.ShapelyFeature(counties, ccrs.PlateCarree())
+
+#county_mn = '/data/GIS/counties_mn/counties_MN.shp'
+#reader_mn = shpreader.Reader(county_mn)
+#counties_mn = list(reader_mn.geometries())
+#COUNTIES_MN = cfeature.ShapelyFeature(counties_mn, ccrs.PlateCarree())
 
 states = cfeature.NaturalEarthFeature(
         category='cultural',
@@ -158,17 +296,20 @@ states = cfeature.NaturalEarthFeature(
 
 lon_formatter = LongitudeFormatter(number_format='.1f',
                        degree_symbol='',
-                       dateline_direction_label=True)
+                       dateline_direction_label=False,
+                       zero_direction_label=False)
+
 lat_formatter = LatitudeFormatter(number_format='.1f',
                       degree_symbol='')
-
-
 
 # Grabs data from imported 'this_case'
 ymin = this_case['latmin']
 ymax = this_case['latmax']
 xmin = this_case['lonmin']
 xmax = this_case['lonmax']
+
+orig_extent = [xmin,xmax,ymin,ymax]
+
 case_date = this_case['date']
 rda = this_case['rda']
 
@@ -178,6 +319,7 @@ rda = this_case['rda']
 vgdone = False
 divdone = False
 veldone = False
+srvdone = False
 swdone = False
 refdone = False
 azdone = False
@@ -187,58 +329,93 @@ dv_fixed = False
 az_fixed = False
 az_shape = None
 dv_shape = None
+got_orig_time = False
 
-# plts is a dictionary with plotting instructions for eah product
+# plts is a dictionary with plotting instructions for each product
 plts = {}
-plts['Velocity_Gradient_Storm'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Velocity Gradient','cbticks':[0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['DivShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['Velocity'] = {'cmap':v_cmap,'vmn':-50,'vmx':50,'title':'Velocity','cbticks':[-40,-30,-20,-10,0,10,20,30,40],'cblabel':'kts'}
+plts['Velocity_Gradient_Storm'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Velocity Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['DivShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['Velocity'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'Velocity','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
+plts['SRV'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'SRV','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
 plts['SpectrumWidth'] = {'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'}
 plts['ReflectivityQC'] = {'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'}
-plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.02,-0.01,0,0.01,0.02],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
 #print(plts)
 
-# list of products to be added to figure. I admit 'test' is a bad name
-test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SpectrumWidth']
+# list of products to be added to figure. I admit 'test' is a horribly ambiguous name
+#test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
+#        'ReflectivityQC','Velocity','SpectrumWidth']
+test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
+        'ReflectivityQC','Velocity','SRV']
 
 arDict = {}
 
-topDir = '/data/radar'
-htmlDir = '/var/www/html/radar/images'
-casePath = os.path.join(topDir,case_date,rda)
-ncPath = os.path.join(casePath,'netcdf')
+# Running on Windows?
+windows = False
+
+if windows:
+    topDir = 'C:/data'
+    case_date = '20080608'
+    rda = 'KGRR'
+    cut_list = ['00.50']
+    case_dir = os.path.join(topDir,case_date,rda)
+    src_dir = os.path.join(case_dir,'stage')
+    base_dst_dir = case_dir
+    image_dir = os.path.join(base_dst_dir,'images')
+    mosaic_dir = os.path.join(image_dir,'mosaic')  
+else:
+    topDir = '/data/radar'
+    case_date = this_case['date']
+    rda = this_case['rda']
+    cut_list = this_case['cutlist']
+    case_dir = os.path.join(topDir,case_date,rda)
+    src_dir = os.path.join(case_dir,'stage')
+    base_dst_dir = '/var/www/html/radar'
+    image_dir = os.path.join(base_dst_dir,'images')
+    mosaic_dir = os.path.join(image_dir,case_date,rda,'mosaic')  
+
+try:
+    os.mkdirs(image_dir)
+except:
+    pass
+
+try:
+    feature_following = this_case['feature_following']
+except:
+    feature_following = False
+
+if feature_following:
+    start_latlon = this_case['start_latlon']
+    end_latlon = this_case['end_latlon']
+    start_time = this_case['start_time']
+    end_time = this_case['end_time']
+    dlat_dt,dlon_dt = calc_dlatlon_dt(start_latlon,start_time,end_latlon,end_time)
+else:
+    dlat_dt = 0
+    dlon_dt = 0
 
 
-srcDir = os.path.join(casePath,'stage')
-#os.system('mkdir -p ' + dstDir)
-imagePath = os.path.join(topDir,'images',case_date,rda)
-os.system('mkdir -p ' + imagePath)
-
-
-file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(srcDir)) for f in fn]
-files = sorted(os.listdir(srcDir))
+file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(src_dir)) for f in fn]
+files = sorted(os.listdir(src_dir))
 #files = files[0:5]
 
- 
 for filename in files:
-    next_file = os.path.join(srcDir,filename)
+    next_file = os.path.join(src_dir,filename)
     data = None
     num_gates = 0
-    myFile = next_file
-    #myFile = filename
-    data = xr.open_dataset(myFile)
+    data = xr.open_dataset(next_file)
     dtype = data.TypeName
-    dstDir = os.path.join(htmlDir,case_date,rda,dtype)
-    try:
-        os.mkdirs(dstDir)
-    except:
-        pass
     degrees_tilt = data.Elevation
     cut_str = str(round(degrees_tilt,2))
     newcut = cut_str.replace(".", "")
     if degrees_tilt < 10:
         newcut = '0' + newcut
     t_str, img_fname_tstr = radar_cut_time(data.Time)
+    this_time = data.Time
+
+    if got_orig_time is False:
+        orig_time = data.Time
+        got_orig_time = True
 
     image_fname = img_fname_tstr + '_' + dtype + '_' + newcut + '.png'
     print('working on ' + image_fname[:-4])
@@ -247,27 +424,15 @@ for filename in files:
     num_gates = len(dnew2.Gate)
     lats,lons,back=latlon_from_radar(azimuths,degrees_tilt,num_gates)
 
-    if dtype == 'Velocity_Gradient_Storm':
-        da= dnew2.Velocity_Gradient_Storm
-        vg_arr = da.to_masked_array(copy=True)
-        arDict[dtype] = {'ar':vg_arr,'lat':lats,'lon':lons}
-        vgdone = True
-
-    elif dtype == 'DivShear_Storm':
-        da = dnew2.DivShear_Storm
-        dv_arr_tmp = da.to_masked_array(copy=True)
-        dv_fill = dv_arr_tmp.filled()
-        dv_fill[dv_fill<-1] = 0
-        dv_shape = np.shape(dv_fill)
-        arDict[dtype] = {'ar':dv_fill,'lat':lats,'lon':lons}
-        dv_fixed = True
-        divdone = True
-
-    elif dtype == 'Velocity':
-        da = dnew2.Velocity
+    if dtype == 'Velocity':
+        da = dnew2.Velocity * 1.944
+        da_vel = da
         vel_arr = da.to_masked_array(copy=True)
         arDict[dtype] = {'ar':vel_arr,'lat':lats,'lon':lons}
         veldone = True
+        # providing lats/lons for SRV (Storm Relative Velocity) 
+        srv_lats = lats
+        srv_lons = lons
 
     elif dtype == 'SpectrumWidth':
         da = dnew2.SpectrumWidth
@@ -288,77 +453,113 @@ for filename in files:
         az_fill[az_fill<-1] = 0
         az_shape = np.shape(az_fill)
         arDict[dtype] = {'ar':az_fill,'lat':lats,'lon':lons}
-        az_fixed = True
         azdone = True
+        # providing lats/lons for Velocity Gradient 
         vg_lats = lats
         vg_lons = lons
-        azdone = True
+
+
+    elif dtype == 'DivShear_Storm':
+        da = dnew2.DivShear_Storm
+        dv_arr_tmp = da.to_masked_array(copy=True)
+        dv_fill = dv_arr_tmp.filled()
+        dv_fill[dv_fill<-1] = 0
+        dv_shape = np.shape(dv_fill)
+        arDict[dtype] = {'ar':dv_fill,'lat':lats,'lon':lons}
+        divdone = True
+
     else:
         pass
 
-    if dv_fixed and az_fixed:
+    if azdone and divdone:
         if (dv_shape == az_shape):
-            np_arr = npsq(dv_fill,az_fill)
-            vg_arr = np_arr
+            #velocity gradient = square root of (divshear**2 + azshear**2)
+            ar_sq = np.square(dv_fill) + np.square(az_fill)
+            vg_arr = np.sqrt(ar_sq)
+            arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
             vgdone = True
-            dtype = 'Velocity_Gradient_Storm'
-            arDict[dtype] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
-            az_fixed = False
-            dv_fixed = False
-            az_shape = None
-            dv_shape = None
+
+    if veldone:
+        # Create SRV from V given an input storm motion
+        da_new_speed = srv(da_vel,265,35)
+        srvdone = True
             
-    if (divdone and veldone and swdone and refdone and azdone and vgdone):
-        fig, axes = plt.subplots(2,3,figsize=(17,10),subplot_kw={'projection': ccrs.PlateCarree()})
-        #axes = axes.flatten()
+    #if (divdone and veldone and swdone and refdone and azdone and vgdone):
+    if (divdone and azdone and vgdone and refdone and veldone and srvdone):
+        fig, axes = plt.subplots(2,3,figsize=(14,7),subplot_kw={'projection': ccrs.PlateCarree()})
         plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
+        font = {'weight' : 'normal',
+                'size'   : 12}
+        plt.titlesize : 20
+        plt.labelsize : 8
+        plt.tick_params(labelsize=8)
+        mpl.rc('font', **font)
 
-        extent = [this_case['lonmin'],this_case['lonmax'],this_case['latmin'],this_case['latmax']]
+        extent,x_ticks,y_ticks = calc_new_extent(orig_time,this_time,dlon_dt,dlat_dt)
+
         for y,a in zip(test,axes.ravel()):
-            a.set_extent(extent, crs=ccrs.PlateCarree())
-            a.add_feature(COUNTIES_MI, facecolor='none', edgecolor='gray')
-            #a.add_feature(COUNTIES_CO, facecolor='none', edgecolor='gray')
-            try:
-                a.plot(this_case['eventloc'][0], this_case['eventloc'][1], 'wv', markersize=3)
-            except:
-                pass
-            try:
-                a.plot(this_case['eventloc2'][0], this_case['eventloc2'][1], 'wv', markersize=3)
-            except:
-                pass
-            a.set_xticks(this_case['lon_ticks'], crs=ccrs.PlateCarree())
-            a.set_yticks(this_case['lat_ticks'], crs=ccrs.PlateCarree())
-            a.xaxis.set_major_formatter(lon_formatter)
-            a.yaxis.set_major_formatter(lat_formatter)
-            a.set_aspect(1.45)
-            lon = arDict[y]['lon']
-            lat = arDict[y]['lat']
-            arr = arDict[y]['ar']
+                this_title = plts[y]['title']
+                a.set_extent(extent, crs=ccrs.PlateCarree())
+                a.add_feature(COUNTIES_ST, facecolor='none', edgecolor='gray')
+                a.tick_params(axis='both', labelsize=8)
+                try:
+                    a.plot(this_case['eventloc'][0], this_case['eventloc'][1], 'wv', markersize=3)
+                except:
+                    pass
+                try:
+                    a.plot(this_case['eventloc2'][0], this_case['eventloc2'][1], 'wv', markersize=3)
+                except:
+                    pass
 
-            cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
-            cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)
-            out=fig.colorbar(cs,cax=cax,**kw)
-            label=out.set_label(plts[y]['cblabel'],size=10,verticalalignment='center')
-            a.set_title(plts[y]['title'])
+                a.set_xticks(x_ticks, crs=ccrs.PlateCarree())
+                a.set_yticks(y_ticks, crs=ccrs.PlateCarree())
+                a.xaxis.set_major_formatter(lon_formatter)
+                a.yaxis.set_major_formatter(lat_formatter)
+ 
+                a.set_aspect(1.25)
+                lon = arDict[y]['lon']
+                lat = arDict[y]['lat']
+                arr = arDict[y]['ar']
+                title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width']
+                cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
+                if this_title in title_test:
+                    cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.4f')
+                    cax.tick_params(labelsize=6)
+                else:
+                    cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)                    
+                    cax.tick_params(labelsize=8)
+                out=fig.colorbar(cs,cax=cax,**kw)
+                label=out.set_label(plts[y]['cblabel'],size=10,verticalalignment='center')
+                a.set_title(this_title)
 
+        # name of figure file to be saved
         mosaic_fname = img_fname_tstr + '_' + newcut + '.png'
-        mosaic_dir = os.path.join(htmlDir,case_date,rda,'mosaic')
-        try:
-            os.makedirs(mosaic_dir)
-        except FileExistsError:
-            pass
-        image_dst_path2 = os.path.join(mosaic_dir,mosaic_fname)
-        plt.savefig(image_dst_path2,format='png')
-        print(image_fname[:-4] + ' mosaic complete!')
+
+        # discovered it's much easier to organize by cuts
+        if not windows:
+            mosaic_cut_dir = os.path.join(mosaic_dir,newcut)      
+            try:
+                os.makedirs(mosaic_cut_dir)
+            except FileExistsError:
+                pass
+        else:
+            mosaic_cut_dir = os.path.join(image_dir,'005')
+
+
+        image_dst_path = os.path.join(mosaic_cut_dir,mosaic_fname)
+        plt.savefig(image_dst_path,format='png')
+        print(mosaic_fname[:-4] + ' mosaic complete!')
 
         #reset these for the next image creation pass
         vgdone = False
+        azdone = False
         divdone = False
         veldone = False
+        srvdone = False
         swdone = False
         refdone = False
         refqcdone = False
-        azdone = False
+
         plt.close()
     else:
         pass
