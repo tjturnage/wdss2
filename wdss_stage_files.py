@@ -49,54 +49,69 @@ import shutil
 regex_elevation = re.compile('[0-9]{1,2}[.][0-9]{1,2}') # match 00.90 from above example
 regex_timestamp = re.compile('[0-9]+[\-][0-9]+')        # match 20190519-224051 from above example
 
+# typical list of radar cuts (i.e., elevation slices) ...
+# ['00.50', '00.90', '01.30', '01.80', '02.40', '03.10', '04.00', '05.10', '06.40', '08.00', '10.00', '12.50', '15.60', '19.50']
 
-case_date = this_case['date']
-rda = this_case['rda']
-cut_list = this_case['cutlist']
-topDir = '/data/radar'
-verb = ' --verbose'
 
-casePath = os.path.join(topDir,case_date,rda)
-ncPath = os.path.join(casePath,'netcdf')
+windows = True
 
-srcDir = ncPath
-dstDir = os.path.join(casePath,'stage')
-os.system('rm -rf ' + dstDir)
-os.system('mkdir -p ' + dstDir)
-imagePath = os.path.join(topDir,'images',case_date,rda)
-os.system('mkdir -p ' + imagePath)
+if windows:
+    topDir = 'C:/data'
+    case_date = '20080608'
+    rda = 'KGRR'
+    #cut_list = ['01.80']
+    cut_list = this_case['cutlist']
+else:
+    topDir = '/data/radar'
+    case_date = this_case['date']
+    rda = this_case['rda']
+    cut_list = this_case['cutlist']
+
+case_dir = os.path.join(topDir,case_date,rda)
+src_dir = os.path.join(case_dir,'netcdf')
+dst_dir = os.path.join(case_dir,'stage')
+imagePath = os.path.join(case_dir,'images')
+
+try:
+    os.mkdirs(imagePath)
+except:
+    print('create ' + str(imagePath) + ' failed!')
+
+
  # the staging directory to later be accessed by wdss_image_process.py
-#try:
-#    shutil.rmtree(dstDir)
-#except:
-#    pass
-#os.makedirs(dstDir)
 
+try:
+    shutil.rmtree(dst_dir)
+except OSError as e:
+    print ("Error: %s - %s." % (e.filename, e.strerror))
 
-product_list = ['AzShear_Storm','DivShear_Storm','ReflectivityQC','SpectrumWidth','Velocity']
+try:
+    os.makedirs(dst_dir)
+except:
+    print('could not create staging dir!')
 
-# other products of interest... ['RhoHV','Zdr','PhiDP']
 
 # Dictionary used to compose new filenames as they get copied to staging directory
 productDict = {'AzShear_Storm':'AzShear','DivShear_Storm':'DivShear',
                'ReflectivityQC':'Refl','SpectrumWidth':'SpecWidth',
-               'Velocity_Gradient_Storm':'VelGrad', 'Velocity':'Velocity'}
+               'Velocity_Gradient_Storm':'VelGrad', 'Velocity':'Velocity',
+               'RhoHV':'CC','Zdr':'ZDR','PhiDP':'PhiDP'}
 
-# typical list of radar cuts (i.e., elevation slices) ...
-# ['00.50', '00.90', '01.30', '01.80', '02.40', '03.10', '04.00', '05.10', '06.40', '08.00', '10.00', '12.50', '15.60', '19.50']
+product_list = ['AzShear_Storm','DivShear_Storm','ReflectivityQC','SpectrumWidth',
+                'Velocity']
+
 #
 # To know for sure which cuts are available, inspect elevation list after running script, i.e.:
 # print(unique_radar_elevations)
 #
 # Typically we want just a subset of cuts for processing
 
-
-radar_elevations = []
+radar_elevations = [cut_list]
 scan_times = []
 new_file_list = []
 
 #Builds a sorted list of full file paths
-file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(srcDir)) for f in fn]
+file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(src_dir)) for f in fn]
 sorted_path_list = sorted(file_list)
 
 # Builds a list of all available radar elevation cuts
@@ -113,35 +128,34 @@ unique_radar_elevations = remove_duplicates(all_radar_elevations)
 
 # As documented earlier, this section needs work - i.e., more robust matching
 for path in range(0,len(sorted_path_list)):
-    path_string = str(sorted_path_list[path])
+    src_filepath = str(sorted_path_list[path])
     for product in product_list:
-        if product in path_string and 'PRF' not in path_string:
+        if product in src_filepath and 'Gradient' not in src_filepath:
             for cuts in cut_list:
-                if cuts in path_string:
-                    new_file_list.append(path_string)
-                    m1 = re.search(regex_elevation, path_string)
-                    m2 = re.search(regex_timestamp, path_string)
+                if cuts in src_filepath:
+                    new_file_list.append(src_filepath)
+                    m1 = re.search(regex_elevation, src_filepath)
+                    m2 = re.search(regex_timestamp, src_filepath)
                     try:
                         elevation_string = m1.group(0)
+                        radar_elevations.append(elevation_string)
                     except:
                         pass
                     try:                        
                         file_timestamp_string = m2.group(0)
+                        scan_times.append(file_timestamp_string)
                     except:
                         pass
 
-                    radar_elevations.append(elevation_string)
-                    scan_times.append(file_timestamp_string)
-                    info = [product,elevation_string,file_timestamp_string]
                     # copy selected files to a staging directory with new, more descriptive names
                     # Important because original timestamp filenames are identical in different source directories
                     # and don't want to overwrite anything. Want to ensure timestamp is beginning of name to 
                     # help with sorting files accordingly
                     new_fname = file_timestamp_string + "_" + productDict[product] + "_" + elevation_string + ".netcdf"
-                    os.path.join(dstDir,new_fname)
-                    print(dstDir + ' ' + new_fname)
-                    #if '-223' in new_fname:
-                    shutil.copy2(path_string,os.path.join(dstDir,new_fname))
+                    dst_filepath = os.path.join(dst_dir,new_fname)
+                    print(src_filepath + '\n  ' + dst_filepath)
+                    
+                    shutil.copy2(src_filepath,dst_filepath)
 
-scans = remove_duplicates(scan_times)
-elevations = remove_duplicates(radar_elevations)
+#scans = remove_duplicates(scan_times)
+#elevations = remove_duplicates(radar_elevations)
