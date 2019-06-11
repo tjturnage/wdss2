@@ -47,7 +47,10 @@ def latlon_from_radar(az,elevation,num_gates):
     """
     rng = None
     factor = math.cos(math.radians(elevation))
-    gate_len = 250.0 * factor
+    if num_gates <= 334:
+        gate_len = 1000.0 * factor
+    else:
+        gate_len = 250.0 * factor
     rng = np.arange(2125.0,(num_gates*gate_len + 2125.0),gate_len)
     g = Geod(ellps='clrk66')
     center_lat = np.ones([len(az),len(rng)])*dnew2.Latitude
@@ -270,8 +273,40 @@ import os
 import math
 from datetime import datetime,timezone
 
+# ----------------------------------------------
+
+case_date = this_case['date']
+rda = this_case['rda']
+cut_list = this_case['cutlist']
+
+# Running on Windows?
+windows = False
+
+if windows:
+    topDir = 'C:/data'
+    case_dir = os.path.join(topDir,case_date,rda)
+    src_dir = os.path.join(case_dir,'stage')
+    base_gis_dir = 'C:/data/GIS'
+    #case_date = '20080608'
+    #rda = 'KGRR'
+    base_dst_dir = case_dir
+    image_dir = os.path.join(base_dst_dir,'images')
+    mosaic_dir = os.path.join(image_dir,'mosaic')  
+else:
+    topDir = '/data/radar'
+    case_dir = os.path.join(topDir,case_date,rda)
+    src_dir = os.path.join(case_dir,'stage')
+    base_gis_dir = '/data/GIS'
+    base_dst_dir = '/var/www/html/radar'
+    image_dir = os.path.join(base_dst_dir,'images')
+    mosaic_dir = os.path.join(image_dir,case_date,rda,'mosaic')
+
+try:
+    os.makedirs(image_dir)
+except:
+    pass
 #counties_list 
-base_gis_dir = '/data/GIS'
+
 for ST in ['MI']:
     st = ST.lower()
     counties_dir = 'counties_' + st
@@ -352,34 +387,8 @@ test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
 
 arDict = {}
 
-# Running on Windows?
-windows = False
 
-if windows:
-    topDir = 'C:/data'
-    case_date = '20080608'
-    rda = 'KGRR'
-    cut_list = ['00.50']
-    case_dir = os.path.join(topDir,case_date,rda)
-    src_dir = os.path.join(case_dir,'stage')
-    base_dst_dir = case_dir
-    image_dir = os.path.join(base_dst_dir,'images')
-    mosaic_dir = os.path.join(image_dir,'mosaic')  
-else:
-    topDir = '/data/radar'
-    case_date = this_case['date']
-    rda = this_case['rda']
-    cut_list = this_case['cutlist']
-    case_dir = os.path.join(topDir,case_date,rda)
-    src_dir = os.path.join(case_dir,'stage')
-    base_dst_dir = '/var/www/html/radar'
-    image_dir = os.path.join(base_dst_dir,'images')
-    mosaic_dir = os.path.join(image_dir,case_date,rda,'mosaic')  
 
-try:
-    os.mkdirs(image_dir)
-except:
-    pass
 
 try:
     feature_following = this_case['feature_following']
@@ -443,7 +452,9 @@ for filename in files:
         swdone = True
 
     elif dtype == 'ReflectivityQC':
+        full_da = dnew2
         da = dnew2.ReflectivityQC
+        ref_da = da
         ref_arr = da.to_masked_array(copy=True)
         arDict[dtype] = {'ar':ref_arr,'lat':lats,'lon':lons}
         refdone = True
@@ -538,14 +549,14 @@ for filename in files:
         mosaic_fname = img_fname_tstr + '_' + newcut + '.png'
 
         # discovered it's much easier to organize by cuts
-        if not windows:
-            mosaic_cut_dir = os.path.join(mosaic_dir,newcut)      
-            try:
-                os.makedirs(mosaic_cut_dir)
-            except FileExistsError:
-                pass
-        else:
-            mosaic_cut_dir = os.path.join(image_dir,'005')
+#        if not windows:
+        mosaic_cut_dir = os.path.join(mosaic_dir,newcut)      
+        try:
+            os.makedirs(mosaic_cut_dir)
+        except FileExistsError:
+            pass
+#        else:
+#            mosaic_cut_dir = os.path.join(image_dir,'005')
 
 
         image_dst_path = os.path.join(mosaic_cut_dir,mosaic_fname)
