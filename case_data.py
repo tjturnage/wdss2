@@ -6,7 +6,6 @@ gets selected with:
 
     this_case = cases['[letter]']    
 
-
 That dictionary then gets imported into:
 
     wdss_create_netcdfs.py          :    make netcdfs for that case
@@ -17,30 +16,27 @@ That dictionary then gets imported into:
 A dictionary contains the following case information:
 
 Required:    
-        cases : key          : arbitrary name for case
-         date : string       : for file/directory naming conventions   
-          rda : string       : also for file/directory naming conventions
-       latmax : float        : north map plot extent
-       latmin : float        : south map plot extent
-       lonmin : float        : west map plot extent
-       lonmax : float        : east map plot extent
-      cutlist : list         : used by wdss_stage_files.py to know which cuts to copy
+         cases : key      : arbitrary name for case
+          date : string   : for file/directory naming conventions   
+           rda : string   : also for file/directory naming conventions
+        latmax : float    : north map plot extent
+        latmin : float    : south map plot extent
+        lonmin : float    : west map plot extent
+        lonmax : float    : east map plot extent
+       cutlist : list     : used by wdss_stage_files.py to know which cuts to copy
   
 Optional:    
-     eventloc : float tuple  : event lat/lon pair to plot as marker 
-    eventloc2 : float tuple  : (event lat/lon pair to plot as marker 
- start_latlon : float tuple  : initial lat/lon coordinates of feature
-   end_latlon : float tuple  : final lat/lon coordinates of feature
+      eventloc : float tuple  : event lat/lon pair to plot as marker 
+     eventloc2 : float tuple  : (event lat/lon pair to plot as marker 
+  start_latlon : float tuple  : initial lat/lon coordinates of feature
+    end_latlon : float tuple  : final lat/lon coordinates of feature
+    start_time : string       : product time stamp associated with start_latlon
+                              ::  example... '2017-07-20 00:07:34'
+      end_time : string       : product time stamp associated with end_latlon
+  storm_motion : float tuple  : storm direction in degrees, speed in knots
 
-   start_time : string       : product time stamp associated with start_latlon
-                             : example -- '2017-07-20 00:07:34'
-
-     end_time : string       : product time stamp associated with end_latlon
- storm_motion : float tuple  : storm direction in degrees, speed in knots
-
-feature_follow: boolean
+feature_follow : boolean      : whether figures should be rendered feature follow
      
-
 author: thomas.turnage@noaa.gov
 Last updated:
     10 June 2019 - removed lat/lon ticks since make_ticks function in create_figures.py does this now
