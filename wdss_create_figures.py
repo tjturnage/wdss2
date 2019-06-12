@@ -65,12 +65,11 @@ def srv(velocity_data_array,storm_dir,storm_speed):
     Subtracts storm motion from velocity bin values. This is based on the cosine of the angle
     between the storm direction and a given array radial direction.
     
-    Storm_dir=250 and storm_speed=30 >> 
-             storm motion from 250 degrees at 30 knots...
-
-             adds up to 30 kts      (at array's  70 degree radial)
-             subtracts up to 30 kts (at array's 250 degree radial)
-             
+    Example...
+        storm_dir,storm_speed : 250,30 
+                 storm motion : from 250 degrees at 30 knots
+             max added amount : 30 kts at array's 70 degree radial
+        max subtracted amount : 30 kts at array's 250 degree radial             
     
     Parameters
     ----------
@@ -130,7 +129,7 @@ def calc_dlatlon_dt(starting_coords,starting_time,ending_coords,ending_time):
     beforehand to track a feature's lat/lon position at two different scan times
     along with the two different scan times.
     
-    This needs to be executed only at the beginning since dlat_dt and dlon_dt should
+    This needs to be executed only once at the beginning since dlat_dt and dlon_dt should
     remain constant.
     
     
@@ -149,14 +148,13 @@ def calc_dlatlon_dt(starting_coords,starting_time,ending_coords,ending_time):
 
         ending_time : string
                       format - 'yyyy-mm-dd HH:MM:SS' - example - '2018-06-01 23:10:05'
-
                                           
     Returns
     -------
             dlat_dt : float
-                      Feature's movement measured in degrees latitude per second
+                      Feature's movement in degrees latitude per second
             dlon_dt : float
-                      Feature's movement measured in degrees longitude per second
+                      Feature's movement in degrees longitude per second
                     
     """ 
     starting_datetime = datetime.strptime(starting_time, "%Y-%m-%d %H:%M:%S")
@@ -174,7 +172,7 @@ def make_ticks(this_min,this_max):
     """
     Determines range of tick marks to plot based on a provided range of degree coordinates.
     This function is typically called by 'calc_new_extent' after that function has calculated
-    a new lat/lon extent for feature-following zoom.
+    new lat/lon extents for feature-following zoom.
     
     Parameters
     ----------
@@ -185,7 +183,7 @@ def make_ticks(this_min,this_max):
                                           
     Returns
     -------
-           tick_arr : array
+           tick_arr : float list
                       list of tick mark labels to use for plotting in the new extent
 
     """
@@ -225,10 +223,6 @@ def calc_new_extent(orig_t,t,lon_rate,lat_rate):
            lat_rate : float
                       Change of latitude per second wrt time
                       determined ahead of time by 'calc_dlatlon_dt' function
-
-      ending_coords : tuple containing two floats - (lat,lon)
-                      Established with radar plotting software to determine
-                      starting coordinates for the feature of interest.
                                           
     Returns
     -------
@@ -279,27 +273,31 @@ case_date = this_case['date']
 rda = this_case['rda']
 cut_list = this_case['cutlist']
 
+try:
+    storm_motion = this_case['storm_motion']
+    storm_dir = storm_motion[0]
+    storm_speed = storm_motion[1]
+except:
+    storm_dir = 240
+    storm_speed = 30
+
 # Running on Windows?
-windows = False
+windows = True
 
 if windows:
     topDir = 'C:/data'
-    case_dir = os.path.join(topDir,case_date,rda)
-    src_dir = os.path.join(case_dir,'stage')
     base_gis_dir = 'C:/data/GIS'
-    #case_date = '20080608'
-    #rda = 'KGRR'
-    base_dst_dir = case_dir
-    image_dir = os.path.join(base_dst_dir,'images')
-    mosaic_dir = os.path.join(image_dir,'mosaic')  
+    base_dst_dir = os.path.join(topDir,case_date,rda)
 else:
     topDir = '/data/radar'
-    case_dir = os.path.join(topDir,case_date,rda)
-    src_dir = os.path.join(case_dir,'stage')
     base_gis_dir = '/data/GIS'
     base_dst_dir = '/var/www/html/radar'
-    image_dir = os.path.join(base_dst_dir,'images')
-    mosaic_dir = os.path.join(image_dir,case_date,rda,'mosaic')
+
+# case_dir example - C:/data/20190529/KGRR
+case_dir = os.path.join(topDir,case_date,rda)
+src_dir = os.path.join(case_dir,'stage')
+image_dir = os.path.join(base_dst_dir,'images')
+mosaic_dir = os.path.join(image_dir,'mosaic')  
 
 try:
     os.makedirs(image_dir)
@@ -314,7 +312,6 @@ for ST in ['MI']:
     counties_shape = 'counties_' + ST + '.shp'
     COUNTIES_ST = 'COUNTIES_' + ST
     counties_shape_path = os.path.join(base_gis_dir,counties_dir,counties_shape)
-
     county_reader = counties_shape_path
     reader = shpreader.Reader(counties_shape_path)
     counties = list(reader.geometries())
@@ -383,15 +380,12 @@ plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShea
 #test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
 #        'ReflectivityQC','Velocity','SpectrumWidth']
 test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
-        'ReflectivityQC','Velocity','SRV']
+        'ReflectivityQC','SRV','SpectrumWidth']
 
 arDict = {}
 
-
-
-
 try:
-    feature_following = this_case['feature_following']
+    feature_following = this_case['feature_follow']
 except:
     feature_following = False
 
@@ -494,11 +488,11 @@ for filename in files:
 
     if veldone:
         # Create SRV from V given an input storm motion
-        da_new_speed = srv(da_vel,265,35)
+        da_new_speed = srv(da_vel,storm_dir,storm_speed)
         srvdone = True
             
     #if (divdone and veldone and swdone and refdone and azdone and vgdone):
-    if (divdone and azdone and vgdone and refdone and veldone and srvdone):
+    if (divdone and azdone and vgdone and refdone and swdone and veldone and srvdone):
         fig, axes = plt.subplots(2,3,figsize=(14,7),subplot_kw={'projection': ccrs.PlateCarree()})
         plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
         font = {'weight' : 'normal',
@@ -555,8 +549,6 @@ for filename in files:
             os.makedirs(mosaic_cut_dir)
         except FileExistsError:
             pass
-#        else:
-#            mosaic_cut_dir = os.path.join(image_dir,'005')
 
 
         image_dst_path = os.path.join(mosaic_cut_dir,mosaic_fname)
