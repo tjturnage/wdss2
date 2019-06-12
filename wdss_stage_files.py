@@ -20,7 +20,7 @@ earlier times they're created.
 
 
 author: thomas.turnage@noaa.gov
-Last updated: 2 Jun 2019
+Last updated: 11 Jun 2019
 """
 
 def remove_duplicates(src_list):
@@ -50,35 +50,29 @@ regex_elevation = re.compile('[0-9]{1,2}[.][0-9]{1,2}') # match 00.90 from above
 regex_timestamp = re.compile('[0-9]+[\-][0-9]+')        # match 20190519-224051 from above example
 
 # typical list of radar cuts (i.e., elevation slices) ...
-# ['00.50', '00.90', '01.30', '01.80', '02.40', '03.10', '04.00', '05.10', '06.40', '08.00', '10.00', '12.50', '15.60', '19.50']
+# ['00.50', '00.90', '01.30', '01.80', '02.40', '03.10',
+# '04.00', '05.10', '06.40', '08.00', '10.00', '12.50', '15.60', '19.50']
+# Normally we'll used just a subset of cuts for processing
 
+case_date = this_case['date']
+rda = this_case['rda']
+cut_list = this_case['cutlist']
 
 windows = True
 
 if windows:
     topDir = 'C:/data'
-    case_date = '20080608'
-    rda = 'KGRR'
-    #cut_list = ['01.80']
-    cut_list = this_case['cutlist']
 else:
     topDir = '/data/radar'
-    case_date = this_case['date']
-    rda = this_case['rda']
-    cut_list = this_case['cutlist']
 
+# case_dir example - C:/data/20190529/KGRR
 case_dir = os.path.join(topDir,case_date,rda)
 src_dir = os.path.join(case_dir,'netcdf')
+
+# dst_dir is where netcdfs will be staged for processing
+# this directory then becomes src_dir for 'wdss_create_figure.py'
 dst_dir = os.path.join(case_dir,'stage')
-imagePath = os.path.join(case_dir,'images')
 
-try:
-    os.mkdirs(imagePath)
-except:
-    print('create ' + str(imagePath) + ' failed!')
-
-
- # the staging directory to later be accessed by wdss_image_process.py
 
 try:
     shutil.rmtree(dst_dir)
@@ -99,12 +93,6 @@ productDict = {'AzShear_Storm':'AzShear','DivShear_Storm':'DivShear',
 
 product_list = ['AzShear_Storm','DivShear_Storm','ReflectivityQC','SpectrumWidth',
                 'Velocity']
-
-#
-# To know for sure which cuts are available, inspect elevation list after running script, i.e.:
-# print(unique_radar_elevations)
-#
-# Typically we want just a subset of cuts for processing
 
 radar_elevations = [cut_list]
 scan_times = []
@@ -147,7 +135,7 @@ for path in range(0,len(sorted_path_list)):
                     except:
                         pass
 
-                    # copy selected files to a staging directory with new, more descriptive names
+                    # copy matched files to staging directory with new, more descriptive names
                     # Important because original timestamp filenames are identical in different source directories
                     # and don't want to overwrite anything. Want to ensure timestamp is beginning of name to 
                     # help with sorting files accordingly
@@ -158,4 +146,8 @@ for path in range(0,len(sorted_path_list)):
                     shutil.copy2(src_filepath,dst_filepath)
 
 #scans = remove_duplicates(scan_times)
+#
+# To know for sure which cuts are available, inspect elevation list after running script, i.e.:
+# print(unique_radar_elevations)
+#
 #elevations = remove_duplicates(radar_elevations)
