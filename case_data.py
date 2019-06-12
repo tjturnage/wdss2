@@ -15,46 +15,38 @@ That dictionary then gets imported into:
     
 
 A dictionary contains the following case information:
-    
-        cases       : key       : arbitrary name for case
-        date        : string    : for file/directory naming conventions   
-        rda         : string    : also for file/directory naming conventions
-        latmax      : float     : north map plot extent
-        latmin      : float     : south map plot extent
-        lonmin      : float     : west map plot extent
-        lonmax      : float     : east map plot extent
-        eventloc    : tuple     : (optional) event lat/lon pair to plot as marker 
-        eventloc2   : tuple     : (optional) event lat/lon pair to plot as marker 
-        cutlist     : list      : used by wdss_stage_files.py to know which cuts to copy
-     
 
+Required:    
+        cases : key          : arbitrary name for case
+         date : string       : for file/directory naming conventions   
+          rda : string       : also for file/directory naming conventions
+       latmax : float        : north map plot extent
+       latmin : float        : south map plot extent
+       lonmin : float        : west map plot extent
+       lonmax : float        : east map plot extent
+      cutlist : list         : used by wdss_stage_files.py to know which cuts to copy
+  
+Optional:    
+     eventloc : float tuple  : event lat/lon pair to plot as marker 
+    eventloc2 : float tuple  : (event lat/lon pair to plot as marker 
+ start_latlon : float tuple  : initial lat/lon coordinates of feature
+   end_latlon : float tuple  : final lat/lon coordinates of feature
+
+   start_time : string       : product time stamp associated with start_latlon
+                             : example -- '2017-07-20 00:07:34'
+
+     end_time : string       : product time stamp associated with end_latlon
+ storm_motion : float tuple  : storm direction in degrees, speed in knots
+
+feature_follow: boolean
+     
 
 author: thomas.turnage@noaa.gov
 Last updated:
-    10 June 2019 - no longer need lat/lon ticks, since make_ticks in create_figures.py does this
+    10 June 2019 - removed lat/lon ticks since make_ticks function in create_figures.py does this now
+    11 June 2019 - added 'storm_motion' as input for srv function in create_figures.py
 ------------------------------------------------
 """
-
-
-
-def create_ticks(low,high):
-    """
-    This function currently not used. Purpose is to auto-create a range of map
-    ticks based on the lat/lon ranges (lat_ticks and lon_ticks),
-    but for now am just creating those manually
-    """
-    a = int(low)
-    b = int(high) + 0.5
-    if a < 0:
-        ticks = np.arange(a,b,0.5)
-        t =  ticks[:-1]
-        return t
-    else:
-        ticks = np.arange(a,b,0.5)
-        t = ticks[1:]        
-        return t     
-
-
 
 cases = {}
 cases['a'] = {'date':'20170919',
@@ -69,7 +61,8 @@ cases['a'] = {'date':'20170919',
      'end_latlon': (47.39,-96.65),
      'start_time': '2017-07-20 00:07:34',
      'end_time': '2017-07-20 00:18:01',
-     'cutlist': ['00.50', '00.90', '01.30', '01.80', '02.40'],
+     'feature_follow': True,
+     'cutlist': ['00.50', '00.90', '01.30', '01.80', '02.40']
      }
 
 
@@ -94,7 +87,10 @@ cases['c'] = {'date':'20190519',
      'start_latlon': (42.43,-85.44),
      'end_latlon': (42.51,-85.246),
      'start_time': '2019-05-19 22:03:39',
-     'end_time': '2019-05-19 22:18:11'
+     'end_time': '2019-05-19 22:18:11',
+     'storm_motion': (240,30),
+     'feature_follow': True,
+     'cutlist': ['00.50']
      }
 
 
@@ -106,7 +102,6 @@ cases['d'] = {'date':'20190527',
      'latmax':39.0,     
      'eventloc': (-102.29,38.59),
      'cutlist': ['00.50', '00.90', '01.30', '01.80', '02.40']
-     #'extent':[-85.75,-85.0,39.30]
      }
 
 cases['e'] = {'date':'20080608',
@@ -119,9 +114,8 @@ cases['e'] = {'date':'20080608',
      'end_latlon': (43.05,-84.65),
      'start_time': '2008-06-08 17:47:51',
      'end_time': '2008-06-08 19:42:28',     
-     'feature_following': True,
-     'cutlist': ['00.50']
-     #'extent':[-85.75,-85.0,39.30]
+     'feature_follow': True,
+     'cutlist': ['02.40']
      }
 
 cases['f'] = {'date':'20190528',
@@ -133,7 +127,6 @@ cases['f'] = {'date':'20190528',
      'eventloc': (-95.41,38.81),
      'eventloc2': (-94.93,39.06),
      'cutlist': ['00.50']
-     #'extent':[-85.75,-85.0,39.30]
      }
 
 
@@ -146,7 +139,6 @@ cases['g'] = {'date':'20190601',
      'eventloc': (-85,19,42.31),
      #'eventloc2': (-94.93,39.06),
      'cutlist': ['00.50']
-     #'extent':[-85.75,-85.0,39.30]
      }
 
 			
@@ -159,7 +151,6 @@ cases['h'] = {'date':'20190601',
      #'eventloc': (-95.41,38.81),
      #'eventloc2': (-94.93,39.06),
      'cutlist': ['00.50','08.00']
-     #'extent':[-89.5,-84.5,41,44.5]
      }
 
 
@@ -169,17 +160,14 @@ cases['h'] = {'date':'20190601',
 #     'lonmin':-96.26,
 #     #'lonmax':-94.45,
 #     'lonmax':-95.11,
-#     'lon_ticks': [-96,-95.5,-95], 
 #     'latmax':39.8,
 #     'latmin':38.40,
-#     'lat_ticks': [38.5,39],
 #     'eventloc': (-95.41,38.81),
 #     'eventloc2': (-94.93,39.06),
 #     'cutlist': ['00.50', '00.90', '01.30', '01.80', '02.40']
-#     #'extent':[-85.75,-85.0,39.30]
 #     }
 
 
 import numpy as np
-this_case = cases['e']
+this_case = cases['c']
 
