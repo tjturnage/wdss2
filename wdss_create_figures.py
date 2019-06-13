@@ -278,8 +278,9 @@ try:
     storm_dir = storm_motion[0]
     storm_speed = storm_motion[1]
 except:
-    storm_dir = 240
-    storm_speed = 30
+    pass
+    #storm_dir = 240
+    #storm_speed = 30
 
 # Running on Windows?
 windows = True
@@ -368,19 +369,22 @@ got_orig_time = False
 # plts is a dictionary with plotting instructions for each product
 plts = {}
 plts['Velocity_Gradient_Storm'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Velocity Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['Conv_Shear_Gradient'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Conv Shear Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
+
 plts['DivShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['DivShear_Neg'] = {'cmap':azdv_cmap,'vmn':0.000,'vmx':0.015,'title':'Convergent Shear','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
+
+plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['AzShear_Pos'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'Positive AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+
 plts['Velocity'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'Velocity','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
 plts['SRV'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'SRV','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
 plts['SpectrumWidth'] = {'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'}
 plts['ReflectivityQC'] = {'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'}
-plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+
 #print(plts)
 
-# list of products to be added to figure. I admit 'test' is a horribly ambiguous name
-#test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
-#        'ReflectivityQC','Velocity','SpectrumWidth']
-test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm',
-        'ReflectivityQC','SRV','SpectrumWidth']
+
 
 arDict = {}
 
@@ -431,6 +435,7 @@ for filename in files:
 
     if dtype == 'Velocity':
         da = dnew2.Velocity * 1.944
+        #print('Velocity!')
         da_vel = da
         vel_arr = da.to_masked_array(copy=True)
         arDict[dtype] = {'ar':vel_arr,'lat':lats,'lon':lons}
@@ -441,13 +446,14 @@ for filename in files:
 
     elif dtype == 'SpectrumWidth':
         da = dnew2.SpectrumWidth
+        #print('Spec!')
         sw_arr = da.to_masked_array(copy=True)
         arDict[dtype] = {'ar':sw_arr,'lat':lats,'lon':lons}
         swdone = True
 
     elif dtype == 'ReflectivityQC':
-        full_da = dnew2
         da = dnew2.ReflectivityQC
+        #print('Ref!')
         ref_da = da
         ref_arr = da.to_masked_array(copy=True)
         arDict[dtype] = {'ar':ref_arr,'lat':lats,'lon':lons}
@@ -455,25 +461,46 @@ for filename in files:
 
     elif dtype == 'AzShear_Storm':
         da = dnew2.AzShear_Storm
+        #print('Az!')
         az_arr_tmp = da.to_masked_array(copy=True)
         az_fill = az_arr_tmp.filled()
         az_fill[az_fill<-1] = 0
         az_shape = np.shape(az_fill)
         arDict[dtype] = {'ar':az_fill,'lat':lats,'lon':lons}
         azdone = True
-        # providing lats/lons for Velocity Gradient 
+
+        azpos_tmp = da.to_masked_array(copy=True)  
+        azpos_fill = azpos_tmp.filled()
+        azpos_fill[azpos_fill<0] = 0
+        azpos_lats = lats
+        azpos_lons = lons
+        arDict['AzShear_Pos'] = {'ar':azpos_fill,'lat':azpos_lats,'lon':azpos_lons}
+        azposdone = True
+
+        # providing lats/lons for Velocity Gradient and Conv Shear Gradient
         vg_lats = lats
         vg_lons = lons
-
+        csg_lats = lats
+        csg_lons = lons
 
     elif dtype == 'DivShear_Storm':
         da = dnew2.DivShear_Storm
+        #print('Div!')
         dv_arr_tmp = da.to_masked_array(copy=True)
         dv_fill = dv_arr_tmp.filled()
         dv_fill[dv_fill<-1] = 0
         dv_shape = np.shape(dv_fill)
-        arDict[dtype] = {'ar':dv_fill,'lat':lats,'lon':lons}
+        dvneg_lats = lats
+        dvneg_lons = lons
+        arDict[dtype] = {'ar':dv_fill,'lat':dvneg_lats,'lon':dvneg_lons}
         divdone = True
+
+        dvneg_tmp = da.to_masked_array(copy=True)
+        dvneg_fill = dvneg_tmp.filled()
+        dvneg_fill[dvneg_fill<-1] = 0
+        dvneg_fill[dvneg_fill>0] = 0
+        dvnegdone = True
+        arDict['DivShear_Neg'] = {'ar':dvneg_fill,'lat':lats,'lon':lons}
 
     else:
         pass
@@ -481,18 +508,27 @@ for filename in files:
     if azdone and divdone:
         if (dv_shape == az_shape):
             # Velocity Gradient equals square root of (divshear**2 + azshear**2)
-            ar_sq = np.square(dv_fill) + np.square(az_fill)
-            vg_arr = np.sqrt(ar_sq)
+            #ar_sq = np.square(dv_fill) + np.square(az_fill)
+            vg_sq = np.square(dv_fill) + np.square(az_fill)
+            vg_arr = np.sqrt(vg_sq)
             arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
             vgdone = True
+
+            # Conv Shear Gradient equals square root of (negative_divshear**2 + positive_azshear**2)
+            #ar_sq = np.square(dv_fill) + np.square(az_fill)
+            csg_sq = np.square(dvneg_fill) + np.square(azpos_fill)
+            csg_arr = np.sqrt(csg_sq)
+            arDict['Conv_Shear_Gradient'] = {'ar':csg_arr,'lat':csg_lats,'lon':csg_lons}
+            csgdone = True
 
     if veldone:
         # Create SRV from V given an input storm motion
         da_new_speed = srv(da_vel,storm_dir,storm_speed)
         srvdone = True
             
+    test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','SRV','Conv_Shear_Gradient']
     #if (divdone and veldone and swdone and refdone and azdone and vgdone):
-    if (divdone and azdone and vgdone and refdone and swdone and veldone and srvdone):
+    if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
         fig, axes = plt.subplots(2,3,figsize=(14,7),subplot_kw={'projection': ccrs.PlateCarree()})
         plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
         font = {'weight' : 'normal',
@@ -503,6 +539,7 @@ for filename in files:
         mpl.rc('font', **font)
 
         extent,x_ticks,y_ticks = calc_new_extent(orig_time,this_time,dlon_dt,dlat_dt)
+
 
         for y,a in zip(test,axes.ravel()):
                 this_title = plts[y]['title']
@@ -527,7 +564,7 @@ for filename in files:
                 lon = arDict[y]['lon']
                 lat = arDict[y]['lat']
                 arr = arDict[y]['ar']
-                title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width']
+                title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                 cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
                 if this_title in title_test:
                     cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.4f')
@@ -541,9 +578,6 @@ for filename in files:
 
         # name of figure file to be saved
         mosaic_fname = img_fname_tstr + '_' + newcut + '.png'
-
-        # discovered it's much easier to organize by cuts
-#        if not windows:
         mosaic_cut_dir = os.path.join(mosaic_dir,newcut)      
         try:
             os.makedirs(mosaic_cut_dir)
@@ -557,8 +591,14 @@ for filename in files:
 
         #reset these for the next image creation pass
         vgdone = False
+        csgdone = False
+
         azdone = False
+        azposdone = False 
+
         divdone = False
+        dvnegdone = False
+
         veldone = False
         srvdone = False
         swdone = False
