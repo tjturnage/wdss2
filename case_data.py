@@ -109,9 +109,25 @@ cases['e'] = {'date':'20080608',
      'start_latlon': (43.51,-86.05),
      'end_latlon': (43.05,-84.65),
      'start_time': '2008-06-08 17:47:51',
-     'end_time': '2008-06-08 19:42:28',     
+     'end_time': '2008-06-08 19:42:28',
+     'storm_motion': (250,45),
      'feature_follow': True,
-     'cutlist': ['02.40']
+     'cutlist': ['00.50']
+     }
+
+cases['eek'] = {'date':'20080608',
+     'rda':'KDTX',
+     'lonmin':-85.22,  # 1.65 / 2 = 0.65
+     'lonmax':-84.0,
+     'latmin':42.35,    # 42.8 ... 1.30 / 2 = 0.65
+     'latmax':43.30,
+     'start_latlon': (42.73,-84.47),
+     'end_latlon': (42.74,-84.29),
+     'start_time': '2008-06-08 20:04:37',
+     'end_time': '2008-06-08 20:13:09',
+     'storm_motion': (267,57),
+     'feature_follow': True,
+     'cutlist': ['00.50']
      }
 
 cases['f'] = {'date':'20190528',
@@ -163,7 +179,5 @@ cases['h'] = {'date':'20190601',
 #     'cutlist': ['00.50', '00.90', '01.30', '01.80', '02.40']
 #     }
 
-
-import numpy as np
-this_case = cases['c']
+this_case = cases['e']
 
