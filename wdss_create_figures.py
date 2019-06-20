@@ -22,7 +22,8 @@ author: thomas.turnage@noaa.gov
 #import case_data
 import sys
 sys.path.append('C:/data/scripts/resources')
-from my_functions import get_shapefile, latlon_from_radar, figure_timestamp, calc_srv, calc_new_extent, calc_dlatlon_dt
+from my_functions import get_shapefile, latlon_from_radar, figure_timestamp
+from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from case_data import this_case 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -40,6 +41,7 @@ import os
 case_date = this_case['date']
 rda = this_case['rda']
 cut_list = this_case['cutlist']
+products = this_case['products']
 
 try:
     storm_motion = this_case['storm_motion']
@@ -64,7 +66,10 @@ else:
 
 # case_dir example - C:/data/20190529/KGRR
 case_dir = os.path.join(topDir,case_date,rda)
-src_dir = os.path.join(case_dir,'stage')
+#src_dir = os.path.join(case_dir,'stage')
+src_dir = os.path.join(case_dir,'netcdf')
+files = create_process_file_list(src_dir,products,cut_list)
+
 image_dir = os.path.join(base_dst_dir,'images')
 mosaic_dir = os.path.join(image_dir,'mosaic')  
 
@@ -155,8 +160,8 @@ else:
     dlon_dt = 0
 
 
-file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(src_dir)) for f in fn]
-files = sorted(os.listdir(src_dir))
+#file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(src_dir)) for f in fn]
+#files = sorted(os.listdir(src_dir))
 #files = files[0:5]
 
 arDict = {}
