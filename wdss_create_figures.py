@@ -18,254 +18,22 @@ author: thomas.turnage@noaa.gov
 
 """ 
 
-def latlon_from_radar(az,elevation,num_gates):
-    """
-    Convert radar bin radial coordinates to lat/lon coordinates.
-    Adapted from Brian Blaylock code
-    
-    Parameters
-    ----------
-          az : numpy array
-               All the radials for that particular product and elevation
-               Changes from 720 radials for super-res product cuts to 360 radials
-   elevation : float
-               The radar elevation slice in degrees. Needed to calculate range 
-               gate length (gate_len) as projected on the ground using simple
-               trigonometry. This is a very crude approximation that doesn't
-               factor for terrain, earth's curvature, or standard beam refraction.
-   num_gates : integer
-               The number of gates in a radial, which varies with 
-               elevation and radar product. That is why each product makes 
-               an individual call to this function. 
-                    
-    Returns
-    -------
-         lat : array like
-         lon : array like
-        back : I have no idea what this is for. I don't use it.
-                    
-    """
-    rng = None
-    factor = math.cos(math.radians(elevation))
-    if num_gates <= 334:
-        gate_len = 1000.0 * factor
-    else:
-        gate_len = 250.0 * factor
-    rng = np.arange(2125.0,(num_gates*gate_len + 2125.0),gate_len)
-    g = Geod(ellps='clrk66')
-    center_lat = np.ones([len(az),len(rng)])*dnew2.Latitude
-    center_lon = np.ones([len(az),len(rng)])*dnew2.Longitude
-    az2D = np.ones_like(center_lat)*az[:,None]
-    rng2D = np.ones_like(center_lat)*np.transpose(rng[:,None])
-    lat,lon,back=g.fwd(center_lon,center_lat,az2D,rng2D)
-    return lat,lon,back
-
-def srv(velocity_data_array,storm_dir,storm_speed):
-    """
-    Subtracts storm motion from velocity bin values. This is based on the cosine of the angle
-    between the storm direction and a given array radial direction.
-    
-    Example...
-        storm_dir,storm_speed : 250,30 
-                 storm motion : from 250 degrees at 30 knots
-             max added amount : 30 kts at array's 70 degree radial
-        max subtracted amount : 30 kts at array's 250 degree radial             
-    
-    Parameters
-    ----------
-    velocity_data_array : xarray
-                          velocity array that will be recalculated
-              storm_dir : float
-                          storm motion direction in compass degrees
-            storm_speed : integer or float
-                          storm speed in knots
-                    
-    Returns
-    -------
-    Nothing - just adds new array to arDict
-                    
-    """
-    da_new_speed = velocity_data_array
-    # Storm motion is given as a "from" direction, so have to flip
-    # this 180 degrees (equal to "pi" radians) to be consistent with
-    # radial "to" direction convention
-    storm_dir = math.radians(storm_dir) - math.pi
-
-    for a in range(0,len(da_vel.Azimuth)):
-        angle = math.radians(da_vel.Azimuth.values[a]) - storm_dir
-        factor = math.cos(angle) * storm_speed
-        da_new_speed[a] = da_new_speed[a] - factor 
-
-    new_speed_arr = da_new_speed.to_masked_array(copy=True)
-    arDict['SRV'] = {'ar':new_speed_arr,'lat':srv_lats,'lon':srv_lons}
-    return
-
-
-def radar_cut_time(t):
-    """
-    Creates user-friendly time strings from Unix Epoch Time:
-    https://en.wikipedia.org/wiki/Unix_time
-    
-    Parameters
-    ----------
-    t : integer
-        
-    Returns
-    -------
-    fig_title_timestring    : 'DD Mon YYYY  -  HH:MM:SS UTC'  
-    fig_filename_timestring : 'YYYYMMDD-HHMMSS'
-                    
-    """    
-    newt = datetime.fromtimestamp(t, timezone.utc)
-    fig_title_timestring = datetime.strftime(newt, "%d %b %Y  -  %H:%M:%S %Z")
-    fig_filename_timestring = datetime.strftime(newt, "%Y%m%d-%H%M%S")
-    return fig_title_timestring,fig_filename_timestring
-
-
-def calc_dlatlon_dt(starting_coords,starting_time,ending_coords,ending_time):
-    """
-    One-time calculation of changes in latitude and longitude with respect to time
-    to implement feature-following zoom. Radar plotting software should be used
-    beforehand to track a feature's lat/lon position at two different scan times
-    along with the two different scan times.
-    
-    This needs to be executed only once at the beginning since dlat_dt and dlon_dt should
-    remain constant.
-    
-    
-    Parameters
-    ----------
-    starting_coords : tuple containing two floats - (lat,lon)
-                      Established with radar plotting software to determine
-                      starting coordinates for the feature of interest.
-
-      starting_time : string
-                      format - 'yyyy-mm-dd HH:MM:SS' - example - '2018-06-01 22:15:55'
-
-      ending_coords : tuple containing two floats - (lat,lon)
-                      Established with radar plotting software to determine
-                      starting coordinates for the feature of interest.
-
-        ending_time : string
-                      format - 'yyyy-mm-dd HH:MM:SS' - example - '2018-06-01 23:10:05'
-                                          
-    Returns
-    -------
-            dlat_dt : float
-                      Feature's movement in degrees latitude per second
-            dlon_dt : float
-                      Feature's movement in degrees longitude per second
-                    
-    """ 
-    starting_datetime = datetime.strptime(starting_time, "%Y-%m-%d %H:%M:%S")
-    ending_datetime = datetime.strptime(ending_time, "%Y-%m-%d %H:%M:%S")
-    dt =  ending_datetime - starting_datetime
-    dt_seconds = dt.seconds
-    print('dt_seconds --------- ' + str(dt_seconds))
-    dlat_dt = (ending_coords[0] - starting_coords[0])/dt_seconds
-    dlon_dt = (ending_coords[1] - starting_coords[1])/dt_seconds
-
-    return dlat_dt, dlon_dt
-    
-
-def make_ticks(this_min,this_max):
-    """
-    Determines range of tick marks to plot based on a provided range of degree coordinates.
-    This function is typically called by 'calc_new_extent' after that function has calculated
-    new lat/lon extents for feature-following zoom.
-    
-    Parameters
-    ----------
-           this_min : float
-                      minimum value of either a lat or lon extent
-           this_max : float
-                      maximum value of either a lat or lon extent
-                                          
-    Returns
-    -------
-           tick_arr : float list
-                      list of tick mark labels to use for plotting in the new extent
-
-    """
-
-    t_min = round(this_min) - 0.5
-    t_max = round(this_max) + 0.5
-    
-    t_init = np.arange(t_min,t_max,0.5)    
-    tick_arr = []
-    for t in range(0,len(t_init)):
-        if t_init[t] >= this_min and t_init[t] <= this_max:
-            tick_arr.append(t_init[t])
-        else:
-            pass
-    return tick_arr
-
-
-def calc_new_extent(orig_t,t,lon_rate,lat_rate):
-    """
-
-    Shifts the map domain with each image to emulate AWIPS feature following zoom.
-    Requires orig_extent [xmin,xmax,ymin,ymax] as a baseline to calculate new_extent
-
-    
-    Parameters
-    ----------
-             orig_t : integer
-                      Epoch time (seconds) of first radar product in loop
-
-                  t : integer
-                      Epoch time (seconds) of current radar product in loop
-
-           lon_rate : float
-                      Change of longitude per second wrt time
-                      determined ahead of time by 'calc_dlatlon_dt' function
-
-           lat_rate : float
-                      Change of latitude per second wrt time
-                      determined ahead of time by 'calc_dlatlon_dt' function
-                                          
-    Returns
-    -------
-         new_extent : list of floats
-                      [min longitude, max longitude, min latitude, max latitude]
-
-             xticks : list of floats
-                      list of longitude ticks to plot
-
-             xticks : list of floats
-                      list of latitude ticks to plot
-                    
-    """    
-    time_shift = t - orig_t
-    lon_shift = time_shift * lon_rate
-    lat_shift = time_shift * lat_rate
-
-    new_xmin = xmin + lon_shift
-    new_xmax = xmax + lon_shift
-    new_ymin = ymin + lat_shift
-    new_ymax = ymax + lat_shift
-    new_extent = [new_xmin,new_xmax,new_ymin,new_ymax]
-    #call 'make_ticks' function to create ticks for new extent
-    x_ticks = make_ticks(new_xmin,new_xmax)
-    y_ticks = make_ticks(new_ymin,new_ymax)
-
-    return new_extent,x_ticks,y_ticks
 
 #import case_data
+import sys
+sys.path.append('C:/data/scripts/resources')
+from my_functions import get_shapefile, latlon_from_radar, figure_timestamp, calc_srv, calc_new_extent, calc_dlatlon_dt
 from case_data import this_case 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from custom_cmaps import sw_cmap,vg_cmap,ref_cmap,azdv_cmap,v_cmap
-from pyproj import Geod
 import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import cartopy.io.shapereader as shpreader
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 import os
-import math
-from datetime import datetime,timezone
+#from datetime import datetime
 
 # ----------------------------------------------
 
@@ -304,24 +72,11 @@ try:
     os.makedirs(image_dir)
 except:
     pass
-#counties_list 
 
-for ST in ['MI']:
-    st = ST.lower()
-    counties_dir = 'counties_' + st
-    county_reader = 'county_' + st
-    counties_shape = 'counties_' + ST + '.shp'
-    COUNTIES_ST = 'COUNTIES_' + ST
-    counties_shape_path = os.path.join(base_gis_dir,counties_dir,counties_shape)
-    county_reader = counties_shape_path
-    reader = shpreader.Reader(counties_shape_path)
-    counties = list(reader.geometries())
-    COUNTIES_ST = cfeature.ShapelyFeature(counties, ccrs.PlateCarree())
 
-#county_mn = '/data/GIS/counties_mn/counties_MN.shp'
-#reader_mn = shpreader.Reader(county_mn)
-#counties_mn = list(reader_mn.geometries())
-#COUNTIES_MN = cfeature.ShapelyFeature(counties_mn, ccrs.PlateCarree())
+base_gis_dir = 'C:/data/GIS'
+shape_path = os.path.join(base_gis_dir,'counties_mi','counties_MI.shp')
+COUNTIES_ST = get_shapefile(shape_path)
 
 states = cfeature.NaturalEarthFeature(
         category='cultural',
@@ -382,11 +137,7 @@ plts['SRV'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'SRV','cbticks':[-100,
 plts['SpectrumWidth'] = {'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'}
 plts['ReflectivityQC'] = {'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'}
 
-#print(plts)
 
-
-
-arDict = {}
 
 try:
     feature_following = this_case['feature_follow']
@@ -408,6 +159,8 @@ file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(sr
 files = sorted(os.listdir(src_dir))
 #files = files[0:5]
 
+arDict = {}
+
 for filename in files:
     next_file = os.path.join(src_dir,filename)
     data = None
@@ -419,7 +172,7 @@ for filename in files:
     newcut = cut_str.replace(".", "")
     if degrees_tilt < 10:
         newcut = '0' + newcut
-    t_str, img_fname_tstr = radar_cut_time(data.Time)
+    t_str, img_fname_tstr = figure_timestamp(data.Time)
     this_time = data.Time
 
     if got_orig_time is False:
@@ -428,10 +181,7 @@ for filename in files:
 
     image_fname = img_fname_tstr + '_' + dtype + '_' + newcut + '.png'
     print('working on ' + image_fname[:-4])
-    dnew2 = data.sortby('Azimuth')
-    azimuths = dnew2.Azimuth.values
-    num_gates = len(dnew2.Gate)
-    lats,lons,back=latlon_from_radar(azimuths,degrees_tilt,num_gates)
+    dnew2,lats,lons,back=latlon_from_radar(data)
 
     if dtype == 'Velocity':
         da = dnew2.Velocity * 1.944
@@ -523,7 +273,8 @@ for filename in files:
 
     if veldone:
         # Create SRV from V given an input storm motion
-        da_new_speed = srv(da_vel,storm_dir,storm_speed)
+        srv_arr = calc_srv(da_vel,storm_dir,storm_speed)
+        arDict['SRV'] = {'ar':srv_arr,'lat':srv_lats,'lon':srv_lons}
         srvdone = True
             
     test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','SRV','Conv_Shear_Gradient']
@@ -538,8 +289,7 @@ for filename in files:
         plt.tick_params(labelsize=8)
         mpl.rc('font', **font)
 
-        extent,x_ticks,y_ticks = calc_new_extent(orig_time,this_time,dlon_dt,dlat_dt)
-
+        extent,x_ticks,y_ticks = calc_new_extent(orig_time,orig_extent,this_time,dlon_dt,dlat_dt)
 
         for y,a in zip(test,axes.ravel()):
                 this_title = plts[y]['title']
@@ -583,7 +333,6 @@ for filename in files:
             os.makedirs(mosaic_cut_dir)
         except FileExistsError:
             pass
-
 
         image_dst_path = os.path.join(mosaic_cut_dir,mosaic_fname)
         plt.savefig(image_dst_path,format='png')
