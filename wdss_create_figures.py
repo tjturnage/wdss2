@@ -18,21 +18,30 @@ author: thomas.turnage@noaa.gov
 
 """ 
 
+windows = False
+import os
+try:
+    os.listdir('/var/www')
+except:
+    windows = True
 
-#import case_data
 import sys
-sys.path.append('C:/data/scripts/resources')
-from my_functions import get_shapefile, latlon_from_radar, figure_timestamp
+if windows:
+    sys.path.append('C:/data/scripts/resources')
+else:
+    sys.path.append('/data/scripts/resources')
+from my_functions import get_shapefile, latlon_from_radar, figure_timestamp, build_html
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from case_data import this_case 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from custom_cmaps import sw_cmap,vg_cmap,ref_cmap,azdv_cmap,v_cmap
+from custom_cmaps import sw_cmap,vg_cmap,ref_cmap,azdv_cmap,azdv_cmap_r,v_cmap
 import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import os
 #from datetime import datetime
 
@@ -53,35 +62,37 @@ except:
     #storm_speed = 30
 
 # Running on Windows?
-windows = True
+
 
 if windows:
-    topDir = 'C:/data'
     base_gis_dir = 'C:/data/GIS'
-    base_dst_dir = os.path.join(topDir,case_date,rda)
-else:
-    topDir = '/data/radar'
-    base_gis_dir = '/data/GIS'
-    base_dst_dir = '/var/www/html/radar'
+    topDir = 'C:/data'
+    case_dir = os.path.join(topDir,case_date,rda)
+    base_dst_dir = os.path.join(topDir,'images',case_date,rda)
+    mosaic_dir = os.path.join(base_dst_dir,'mosaic') 
 
+else:
+    base_gis_dir = '/data/GIS'
+    case_dir = os.path.join('/data/radar',case_date,rda)
+    base_dst_dir = os.path.join('/var/www/html/radar/images',case_date,rda)
+    mosaic_dir = os.path.join(base_dst_dir,'mosaic')
 # case_dir example - C:/data/20190529/KGRR
-case_dir = os.path.join(topDir,case_date,rda)
+
 #src_dir = os.path.join(case_dir,'stage')
 src_dir = os.path.join(case_dir,'netcdf')
-files = create_process_file_list(src_dir,products,cut_list)
+files = create_process_file_list(src_dir,products,cut_list,windows)
 
-image_dir = os.path.join(base_dst_dir,'images')
-mosaic_dir = os.path.join(image_dir,'mosaic')  
 
 try:
-    os.makedirs(image_dir)
+    os.makedirs(mosaic_dir)
 except:
     pass
 
 
-base_gis_dir = 'C:/data/GIS'
-shape_path = os.path.join(base_gis_dir,'counties_mi','counties_MI.shp')
-COUNTIES_ST = get_shapefile(shape_path)
+shape_path = os.path.join(base_gis_dir,'counties_nd','counties_ND.shp')
+COUNTIES_ND = get_shapefile(shape_path)
+shape_path = os.path.join(base_gis_dir,'counties_mn','counties_MN.shp')
+COUNTIES_MN = get_shapefile(shape_path)
 
 states = cfeature.NaturalEarthFeature(
         category='cultural',
@@ -131,8 +142,8 @@ plts = {}
 plts['Velocity_Gradient_Storm'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Velocity Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
 plts['Conv_Shear_Gradient'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Conv Shear Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
 
-plts['DivShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['DivShear_Neg'] = {'cmap':azdv_cmap,'vmn':0.000,'vmx':0.015,'title':'Convergent Shear','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['DivShear_Storm'] = {'cmap':azdv_cmap_r,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
+plts['DivShear_Neg'] = {'cmap':azdv_cmap_r,'vmn':0.000,'vmx':0.015,'title':'Convergent Shear','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
 
 plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
 plts['AzShear_Pos'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'Positive AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
@@ -141,7 +152,6 @@ plts['Velocity'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'Velocity','cbtic
 plts['SRV'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'SRV','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
 plts['SpectrumWidth'] = {'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'}
 plts['ReflectivityQC'] = {'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'}
-
 
 
 try:
@@ -282,13 +292,13 @@ for filename in files:
         arDict['SRV'] = {'ar':srv_arr,'lat':srv_lats,'lon':srv_lons}
         srvdone = True
             
-    test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','SRV','Conv_Shear_Gradient']
+    test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
     #if (divdone and veldone and swdone and refdone and azdone and vgdone):
     if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
-        fig, axes = plt.subplots(2,3,figsize=(14,7),subplot_kw={'projection': ccrs.PlateCarree()})
+        fig, axes = plt.subplots(2,3,figsize=(11,7),subplot_kw={'projection': ccrs.PlateCarree()})
         plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
         font = {'weight' : 'normal',
-                'size'   : 12}
+                'size'   : 8}
         plt.titlesize : 20
         plt.labelsize : 8
         plt.tick_params(labelsize=8)
@@ -299,7 +309,8 @@ for filename in files:
         for y,a in zip(test,axes.ravel()):
                 this_title = plts[y]['title']
                 a.set_extent(extent, crs=ccrs.PlateCarree())
-                a.add_feature(COUNTIES_ST, facecolor='none', edgecolor='gray')
+                a.add_feature(COUNTIES_ND, facecolor='none', edgecolor='gray')
+                a.add_feature(COUNTIES_MN, facecolor='none', edgecolor='gray')
                 a.tick_params(axis='both', labelsize=8)
                 try:
                     a.plot(this_case['eventloc'][0], this_case['eventloc'][1], 'wv', markersize=3)
@@ -309,7 +320,11 @@ for filename in files:
                     a.plot(this_case['eventloc2'][0], this_case['eventloc2'][1], 'wv', markersize=3)
                 except:
                     pass
-
+                
+                a.xformatter = LONGITUDE_FORMATTER
+                a.yformatter = LATITUDE_FORMATTER
+                a.xlabel_style = {'size': 8, 'color': 'gray'}
+                a.ylabel_style = {'size': 8, 'color': 'gray'}
                 a.set_xticks(x_ticks, crs=ccrs.PlateCarree())
                 a.set_yticks(y_ticks, crs=ccrs.PlateCarree())
                 a.xaxis.set_major_formatter(lon_formatter)
@@ -319,16 +334,17 @@ for filename in files:
                 lon = arDict[y]['lon']
                 lat = arDict[y]['lat']
                 arr = arDict[y]['ar']
-                title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
+                title_test = ['AzShear','DivShear','ReflectivityQC','Velocity']
+                #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                 cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
                 if this_title in title_test:
                     cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.4f')
                     cax.tick_params(labelsize=6)
                 else:
                     cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)                    
-                    cax.tick_params(labelsize=8)
+                    cax.tick_params(labelsize=6)
                 out=fig.colorbar(cs,cax=cax,**kw)
-                label=out.set_label(plts[y]['cblabel'],size=10,verticalalignment='center')
+                label=out.set_label(plts[y]['cblabel'],size=8,verticalalignment='center')
                 a.set_title(this_title)
 
         # name of figure file to be saved
@@ -361,4 +377,13 @@ for filename in files:
 
         plt.close()
     else:
+        pass
+
+for c in cut_list:
+    new_c = c.replace(".", "")
+    new_c = new_c[:-1]
+    image_dir = os.path.join(mosaic_dir,new_c)
+    try:
+        build_html(image_dir)
+    except:
         pass
