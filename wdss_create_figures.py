@@ -18,30 +18,32 @@ author: thomas.turnage@noaa.gov
 
 """ 
 
-windows = False
+import sys
 import os
+
 try:
     os.listdir('/var/www')
+    windows = False
+    sys.path.append('/data/scripts/resources')
 except:
     windows = True
-
-import sys
-if windows:
     sys.path.append('C:/data/scripts/resources')
-else:
-    sys.path.append('/data/scripts/resources')
-from my_functions import get_shapefile, latlon_from_radar, figure_timestamp, build_html
+
+from my_functions import latlon_from_radar, figure_timestamp, build_html
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from case_data import this_case 
+from custom_cmaps import plts
+from gis_layers import shape_mini
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from custom_cmaps import sw_cmap,vg_cmap,ref_cmap,azdv_cmap,azdv_cmap_r,v_cmap
 import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+#import cartopy.feature as cfeature
+#   from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 import os
 #from datetime import datetime
 
@@ -51,6 +53,10 @@ case_date = this_case['date']
 rda = this_case['rda']
 cut_list = this_case['cutlist']
 products = this_case['products']
+try:
+    shapelist = this_case['shapelist']
+except:
+    pass
 
 try:
     storm_motion = this_case['storm_motion']
@@ -78,7 +84,6 @@ else:
     mosaic_dir = os.path.join(base_dst_dir,'mosaic')
 # case_dir example - C:/data/20190529/KGRR
 
-#src_dir = os.path.join(case_dir,'stage')
 src_dir = os.path.join(case_dir,'netcdf')
 files = create_process_file_list(src_dir,products,cut_list,windows)
 
@@ -88,25 +93,6 @@ try:
 except:
     pass
 
-
-shape_path = os.path.join(base_gis_dir,'counties_nd','counties_ND.shp')
-COUNTIES_ND = get_shapefile(shape_path)
-shape_path = os.path.join(base_gis_dir,'counties_mn','counties_MN.shp')
-COUNTIES_MN = get_shapefile(shape_path)
-
-states = cfeature.NaturalEarthFeature(
-        category='cultural',
-        name='admin_1_states_provinces_lines',
-        scale='50m',
-        facecolor='none')
-
-lon_formatter = LongitudeFormatter(number_format='.1f',
-                       degree_symbol='',
-                       dateline_direction_label=False,
-                       zero_direction_label=False)
-
-lat_formatter = LatitudeFormatter(number_format='.1f',
-                      degree_symbol='')
 
 # Grabs data from imported 'this_case'
 ymin = this_case['latmin']
@@ -138,20 +124,6 @@ dv_shape = None
 got_orig_time = False
 
 # plts is a dictionary with plotting instructions for each product
-plts = {}
-plts['Velocity_Gradient_Storm'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Velocity Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['Conv_Shear_Gradient'] = {'cmap':vg_cmap,'vmn':0.000,'vmx':0.015,'title':'Conv Shear Gradient','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
-
-plts['DivShear_Storm'] = {'cmap':azdv_cmap_r,'vmn':-0.01,'vmx':0.01,'title':'DivShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['DivShear_Neg'] = {'cmap':azdv_cmap_r,'vmn':0.000,'vmx':0.015,'title':'Convergent Shear','cbticks':[0,0.005,0.010,0.015],'cblabel':'s $\mathregular{^-}{^1}$'}
-
-plts['AzShear_Storm'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
-plts['AzShear_Pos'] = {'cmap':azdv_cmap,'vmn':-0.01,'vmx':0.01,'title':'Positive AzShear','cbticks':[-0.010,-0.005,0,0.005,0.010],'cblabel':'s $\mathregular{^-}{^1}$'}
-
-plts['Velocity'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'Velocity','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
-plts['SRV'] = {'cmap':v_cmap,'vmn':-100,'vmx':100,'title':'SRV','cbticks':[-100,-80,-60,-40,-20,0,20,40,60,80,100],'cblabel':'kts'}
-plts['SpectrumWidth'] = {'cmap':sw_cmap,'vmn':0,'vmx':40,'title':'Spectrum Width','cbticks':[0,10,15,20,25,40],'cblabel':'kts'}
-plts['ReflectivityQC'] = {'cmap':ref_cmap,'vmn':-30,'vmx':80,'title':'Reflectivity','cbticks':[0,15,30,50,60],'cblabel':'dBZ'}
 
 
 try:
@@ -170,12 +142,9 @@ else:
     dlon_dt = 0
 
 
-#file_list = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(src_dir)) for f in fn]
-#files = sorted(os.listdir(src_dir))
-#files = files[0:5]
-
 arDict = {}
 
+#files = files[0:5]
 for filename in files:
     next_file = os.path.join(src_dir,filename)
     data = None
@@ -210,11 +179,13 @@ for filename in files:
         srv_lons = lons
 
     elif dtype == 'SpectrumWidth':
-        da = dnew2.SpectrumWidth
-        #print('Spec!')
-        sw_arr = da.to_masked_array(copy=True)
-        arDict[dtype] = {'ar':sw_arr,'lat':lats,'lon':lons}
-        swdone = True
+        print('skipping SW')
+        #da = dnew2.SpectrumWidth
+        ##print('Spec!')
+        #sw_arr = da.to_masked_array(copy=True)
+        #arDict[dtype] = {'ar':sw_arr,'lat':lats,'lon':lons}
+        #swdone = True
+        #pass
 
     elif dtype == 'ReflectivityQC':
         da = dnew2.ReflectivityQC
@@ -234,19 +205,10 @@ for filename in files:
         arDict[dtype] = {'ar':az_fill,'lat':lats,'lon':lons}
         azdone = True
 
-        azpos_tmp = da.to_masked_array(copy=True)  
-        azpos_fill = azpos_tmp.filled()
-        azpos_fill[azpos_fill<0] = 0
-        azpos_lats = lats
-        azpos_lons = lons
-        arDict['AzShear_Pos'] = {'ar':azpos_fill,'lat':azpos_lats,'lon':azpos_lons}
-        azposdone = True
-
-        # providing lats/lons for Velocity Gradient and Conv Shear Gradient
+        # providing lats/lons for Velocity Gradient
         vg_lats = lats
         vg_lons = lons
-        csg_lats = lats
-        csg_lons = lons
+
 
     elif dtype == 'DivShear_Storm':
         da = dnew2.DivShear_Storm
@@ -255,17 +217,9 @@ for filename in files:
         dv_fill = dv_arr_tmp.filled()
         dv_fill[dv_fill<-1] = 0
         dv_shape = np.shape(dv_fill)
-        dvneg_lats = lats
-        dvneg_lons = lons
-        arDict[dtype] = {'ar':dv_fill,'lat':dvneg_lats,'lon':dvneg_lons}
+        arDict[dtype] = {'ar':dv_fill,'lat':lats,'lon':lons}
         divdone = True
 
-        dvneg_tmp = da.to_masked_array(copy=True)
-        dvneg_fill = dvneg_tmp.filled()
-        dvneg_fill[dvneg_fill<-1] = 0
-        dvneg_fill[dvneg_fill>0] = 0
-        dvnegdone = True
-        arDict['DivShear_Neg'] = {'ar':dvneg_fill,'lat':lats,'lon':lons}
 
     else:
         pass
@@ -279,12 +233,6 @@ for filename in files:
             arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
             vgdone = True
 
-            # Conv Shear Gradient equals square root of (negative_divshear**2 + positive_azshear**2)
-            #ar_sq = np.square(dv_fill) + np.square(az_fill)
-            csg_sq = np.square(dvneg_fill) + np.square(azpos_fill)
-            csg_arr = np.sqrt(csg_sq)
-            arDict['Conv_Shear_Gradient'] = {'ar':csg_arr,'lat':csg_lats,'lon':csg_lons}
-            csgdone = True
 
     if veldone:
         # Create SRV from V given an input storm motion
@@ -294,8 +242,9 @@ for filename in files:
             
     test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
     #if (divdone and veldone and swdone and refdone and azdone and vgdone):
-    if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
-        fig, axes = plt.subplots(2,3,figsize=(11,7),subplot_kw={'projection': ccrs.PlateCarree()})
+    #if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
+    if (divdone and azdone and vgdone and refdone and veldone and srvdone):
+        fig, axes = plt.subplots(2,3,figsize=(12,7),subplot_kw={'projection': ccrs.PlateCarree()})
         plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
         font = {'weight' : 'normal',
                 'size'   : 8}
@@ -309,9 +258,9 @@ for filename in files:
         for y,a in zip(test,axes.ravel()):
                 this_title = plts[y]['title']
                 a.set_extent(extent, crs=ccrs.PlateCarree())
-                a.add_feature(COUNTIES_ND, facecolor='none', edgecolor='gray')
-                a.add_feature(COUNTIES_MN, facecolor='none', edgecolor='gray')
-                a.tick_params(axis='both', labelsize=8)
+                for sh in shape_mini:
+                    a.add_feature(shape_mini[sh], facecolor='none', edgecolor='gray')
+                    a.tick_params(axis='both', labelsize=8)
                 try:
                     a.plot(this_case['eventloc'][0], this_case['eventloc'][1], 'wv', markersize=3)
                 except:
@@ -321,20 +270,19 @@ for filename in files:
                 except:
                     pass
                 
+                a.set_aspect(1.25)
                 a.xformatter = LONGITUDE_FORMATTER
                 a.yformatter = LATITUDE_FORMATTER
-                a.xlabel_style = {'size': 8, 'color': 'gray'}
-                a.ylabel_style = {'size': 8, 'color': 'gray'}
-                a.set_xticks(x_ticks, crs=ccrs.PlateCarree())
-                a.set_yticks(y_ticks, crs=ccrs.PlateCarree())
-                a.xaxis.set_major_formatter(lon_formatter)
-                a.yaxis.set_major_formatter(lat_formatter)
- 
-                a.set_aspect(1.25)
+                gl = a.gridlines(color='gray',alpha=0.0,draw_labels=True) 
+                gl.xlabels_top, gl.ylabels_right = False, False
+                gl.xlabel_style, gl.ylabel_style = {'fontsize': 8}, {'fontsize': 7}
+                gl.xlocator = mticker.FixedLocator(x_ticks)
+                gl.ylocator = mticker.FixedLocator(y_ticks)
+
                 lon = arDict[y]['lon']
                 lat = arDict[y]['lat']
                 arr = arDict[y]['ar']
-                title_test = ['AzShear','DivShear','ReflectivityQC','Velocity']
+                title_test = ['AzShear','DivShear']
                 #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                 cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
                 if this_title in title_test:
