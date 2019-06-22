@@ -27,8 +27,3 @@ wdss_create_figures.py
 ---------------------
 Takes the staged files and creates multi-pane images. Also leverages 'case_data.py' to control workflow.
 Imports custom_maps.py to get the color tables needed to render the maps.
-
-custom_maps.py
----------------------
-Color maps that are created and then imported into wdss_create_figures.py with a dictionary containing other plot instructions
-based on product being plotted.
