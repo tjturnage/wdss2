@@ -22,12 +22,6 @@ you want to process additional radar data.
 Note: importing case metadata from case_data.py doesn't seem to work here (because of using os.system ??).
       Therefore am hard-wiring required arguments into script instead.
 
-wdss_stage_files.py
----------------------
-Moves the desired netcdf files to a staging directory and gives each one a unique name
-to eliminate duplicates and any overwriting issues. Case information imported from 'case_data.py'
-informs the file paths and selections. The new files are sorted in chronological order, which is 
-what 'wdss_create_figures.py' is expecting.
 
 wdss_create_figures.py
 ---------------------
@@ -36,4 +30,5 @@ Imports custom_maps.py to get the color tables needed to render the maps.
 
 custom_maps.py
 ---------------------
-Color maps that are created and then imported into wdss_create_figures.py
+Color maps that are created and then imported into wdss_create_figures.py with a dictionary containing other plot instructions
+based on product being plotted.
