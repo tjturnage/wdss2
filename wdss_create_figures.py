@@ -2,25 +2,45 @@
 """
 Creates maps from wdss-ii nedcdf files that can be saved as images
 WDSS-II information : http://www.wdssii.org/
-
-
 author: thomas.turnage@noaa.gov
    Last updated : 23 Jun 2019
-
    New features:
             srv : function to create Storm Relative Velocity (SRV)
      make_ticks : function to create lat/lon ticks for an extent
-
         simpler way to call state shapefiles to add to maps
 ------------------------------------------------
-
 """ 
 
 import sys
 import os
-from case_data import this_case
-case_date = this_case['date']
-rda = this_case['rda']
+
+try:
+    os.listdir('/var/www')
+    windows = False
+    sys.path.append('/data/scripts/resources')
+    from case_data import this_case
+    case_date = this_case['date']
+    rda = this_case['rda']
+    base_gis_dir = '/data/GIS'
+
+    case_dir = os.path.join('/data/radar',case_date,rda)
+    base_dst_dir = os.path.join('/var/www/html/radar/images',case_date,rda)
+    mosaic_dir = os.path.join(base_dst_dir,'mosaic')
+except:
+    windows = True
+    sys.path.append('C:/data/scripts/resources')
+    from case_data import this_case
+    base_gis_dir = 'C:/data/GIS'
+    topDir = 'C:/data'
+    case_date = this_case['date']
+    rda = this_case['rda']
+    case_dir = os.path.join(topDir,case_date,rda)
+    base_dst_dir = os.path.join(topDir,'images',case_date,rda)
+    mosaic_dir = os.path.join(base_dst_dir,'mosaic') 
+
+
+
+
 cut_list = this_case['cutlist']
 products = this_case['products']
 ymin = this_case['latmin']
@@ -58,22 +78,7 @@ try:
 except:
     feature_following = False
 
-try:
-    os.listdir('/var/www')
-    windows = False
-    sys.path.append('/data/scripts/resources')
-    base_gis_dir = '/data/GIS'
-    case_dir = os.path.join('/data/radar',case_date,rda)
-    base_dst_dir = os.path.join('/var/www/html/radar/images',case_date,rda)
-    mosaic_dir = os.path.join(base_dst_dir,'mosaic')
-except:
-    windows = True
-    sys.path.append('C:/data/scripts/resources')
-    base_gis_dir = 'C:/data/GIS'
-    topDir = 'C:/data'
-    case_dir = os.path.join(topDir,case_date,rda)
-    base_dst_dir = os.path.join(topDir,'images',case_date,rda)
-    mosaic_dir = os.path.join(base_dst_dir,'mosaic') 
+
 
 from my_functions import latlon_from_radar, figure_timestamp, build_html
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
@@ -241,11 +246,13 @@ for filename in files:
         #if (divdone and veldone and swdone and refdone and azdone and vgdone):
         #if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
         if (divdone and azdone and vgdone and refdone and veldone and srvdone):
-            fig, axes = plt.subplots(2,3,figsize=(12,7),subplot_kw={'projection': ccrs.PlateCarree()})
+            fig, axes = plt.subplots(2,3,figsize=(20,12),subplot_kw={'projection': ccrs.PlateCarree()})
+            font = {'weight' : 'normal',
+                    'size'   : 24}
             plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
             font = {'weight' : 'normal',
-                    'size'   : 8}
-            plt.titlesize : 20
+                    'size'   : 12}
+            plt.titlesize : 24
             plt.labelsize : 8
             plt.tick_params(labelsize=8)
             mpl.rc('font', **font)
@@ -272,7 +279,7 @@ for filename in files:
                     a.yformatter = LATITUDE_FORMATTER
                     gl = a.gridlines(color='gray',alpha=0.0,draw_labels=True) 
                     gl.xlabels_top, gl.ylabels_right = False, False
-                    gl.xlabel_style, gl.ylabel_style = {'fontsize': 8}, {'fontsize': 7}
+                    gl.xlabel_style, gl.ylabel_style = {'fontsize': 9}, {'fontsize': 9}
                     gl.xlocator = mticker.FixedLocator(x_ticks)
                     gl.ylocator = mticker.FixedLocator(y_ticks)
     
