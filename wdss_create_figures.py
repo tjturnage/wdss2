@@ -39,8 +39,6 @@ except:
     mosaic_dir = os.path.join(base_dst_dir,'mosaic') 
 
 
-
-
 cut_list = this_case['cutlist']
 products = this_case['products']
 ymin = this_case['latmin']
@@ -49,12 +47,16 @@ xmin = this_case['lonmin']
 xmax = this_case['lonmax']
 orig_extent = [xmin,xmax,ymin,ymax]
 
-
+# test for existence of associated shapefiles
 try:
     shapelist = this_case['shapelist']
 except:
     pass
 
+# test for case time range in which to create figures
+# uses integer format of YYYYMMDDHHMMSS
+# example: 20190720053000
+    
 try:
     start_fig = this_case['start_figures']
 except:
@@ -73,10 +75,7 @@ except:
     storm_dir = 240
     storm_speed = 30
 
-try:
-    feature_following = this_case['feature_follow']
-except:
-    feature_following = False
+
 
 
 
@@ -84,7 +83,7 @@ from my_functions import latlon_from_radar, figure_timestamp, build_html
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from custom_cmaps import plts
 from gis_layers import shape_mini
-
+from re import search
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -102,7 +101,7 @@ import matplotlib.ticker as mticker
 src_dir = os.path.join(case_dir,'netcdf')
 files = create_process_file_list(src_dir,products,cut_list,windows)
 
-
+# ensure mosaic directory is created
 try:
     os.makedirs(mosaic_dir)
 except:
@@ -116,16 +115,25 @@ divdone = False
 veldone = False
 srvdone = False
 swdone = False
+ccdone = False
 refdone = False
 azdone = False
-azsq_done = False
-divsq_done = False
+#azsq_done = False
+#divsq_done = False
 dv_fixed = False
 az_fixed = False
 az_shape = None
 dv_shape = None
 got_orig_time = False
 
+
+# if case data defines feature_following as true
+# check for associated feature start/end lat and lon positions
+# use them to call "calc_dlatlon_dt" function
+try:
+    feature_following = this_case['feature_follow']
+except:
+    feature_following = False
 
 if feature_following:
     start_latlon = this_case['start_latlon']
@@ -140,7 +148,6 @@ else:
 
 arDict = {}
 
-#files = files[0:5]
 for filename in files:
     next_file = os.path.join(src_dir,filename)
     fsplit = str.split(filename,'/')
@@ -171,7 +178,6 @@ for filename in files:
     
         if dtype == 'Velocity':
             da = dnew2.Velocity * 1.944
-            #print('Velocity!')
             da_vel = da
             vel_arr = da.to_masked_array(copy=True)
             arDict[dtype] = {'ar':vel_arr,'lat':lats,'lon':lons}
@@ -191,15 +197,20 @@ for filename in files:
     
         elif dtype == 'ReflectivityQC':
             da = dnew2.ReflectivityQC
-            #print('Ref!')
             ref_da = da
             ref_arr = da.to_masked_array(copy=True)
             arDict[dtype] = {'ar':ref_arr,'lat':lats,'lon':lons}
             refdone = True
+
+        elif dtype == 'RhoHV':
+            da = dnew2.RhoHV
+            cc_da = da
+            cc_arr = da.to_masked_array(copy=True)
+            arDict[dtype] = {'ar':cc_arr,'lat':lats,'lon':lons}
+            ccdone = True
     
         elif dtype == 'AzShear_Storm':
             da = dnew2.AzShear_Storm
-            #print('Az!')
             az_arr_tmp = da.to_masked_array(copy=True)
             az_fill = az_arr_tmp.filled()
             az_fill[az_fill<-1] = 0
@@ -214,7 +225,6 @@ for filename in files:
     
         elif dtype == 'DivShear_Storm':
             da = dnew2.DivShear_Storm
-            #print('Div!')
             dv_arr_tmp = da.to_masked_array(copy=True)
             dv_fill = dv_arr_tmp.filled()
             dv_fill[dv_fill<-1] = 0
@@ -241,8 +251,8 @@ for filename in files:
             srv_arr = calc_srv(da_vel,storm_dir,storm_speed)
             arDict['SRV'] = {'ar':srv_arr,'lat':srv_lats,'lon':srv_lons}
             srvdone = True
-                
-        test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
+        test = ['AzShear_Storm','DivShear_Storm','RhoHV','ReflectivityQC','Velocity','SRV']
+        #test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
         #if (divdone and veldone and swdone and refdone and azdone and vgdone):
         #if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
         if (divdone and azdone and vgdone and refdone and veldone and srvdone):
@@ -262,9 +272,12 @@ for filename in files:
             for y,a in zip(test,axes.ravel()):
                     this_title = plts[y]['title']
                     a.set_extent(extent, crs=ccrs.PlateCarree())
+                    a.tick_params(axis='both', labelsize=8)
                     for sh in shape_mini:
-                        a.add_feature(shape_mini[sh], facecolor='none', edgecolor='gray', linewidth=0.5)
-                        a.tick_params(axis='both', labelsize=8)
+                        if search('survey', str(sh)):
+                            a.add_feature(shape_mini[sh], facecolor='none', edgecolor='yellow', linewidth=0.7)
+                        else:
+                            a.add_feature(shape_mini[sh], facecolor='none', edgecolor='gray', linewidth=0.5)                            
                     try:
                         a.plot(this_case['eventloc'][0], this_case['eventloc'][1], 'wv', markersize=3)
                     except:
