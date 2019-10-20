@@ -40,7 +40,24 @@ except:
 
 
 cut_list = this_case['cutlist']
-products = this_case['products']
+#products = this_case['products']
+#products = ['ReflectivityQC','Velocity','RhoHV','AzShear_Storm']
+products = ['ReflectivityQC','SRV','RhoHV']
+mosaic_size = {}
+mosaic_size[2] = {'h':6,'w':15,'rows':1,'columns':2}
+mosaic_size[3] = {'h':6,'w':17,'rows':1,'columns':3}
+mosaic_size[4] = {'h':12,'w':14,'rows':2,'columns':2}
+mosaic_size[6] = {'h':12,'w':20,'rows':2,'columns':3}
+height = mosaic_size[len(products)]['h']
+width = mosaic_size[len(products)]['w']
+rows = mosaic_size[len(products)]['rows']
+cols = mosaic_size[len(products)]['columns']
+if 'SRV' in products and 'Velocity' not in products:
+    prod_temp = products.append('Velocity')
+product_status = {}
+for p in products:
+    product_status[p] = 'no'
+
 ymin = this_case['latmin']
 ymax = this_case['latmax']
 xmin = this_case['lonmin']
@@ -61,12 +78,12 @@ try:
     start_fig = this_case['start_figures']
 except:
     start_fig = 0
-
 try:
     end_fig = this_case['end_figures']
 except:
     end_fig = 99999999999999999
 
+# test if storm motion exists in case data for SRV calculation
 try:
     storm_motion = this_case['storm_motion']
     storm_dir = storm_motion[0]
@@ -74,9 +91,6 @@ try:
 except:
     storm_dir = 240
     storm_speed = 30
-
-
-
 
 
 from my_functions import latlon_from_radar, figure_timestamp, build_html
@@ -97,7 +111,7 @@ import matplotlib.ticker as mticker
 
 # ----------------------------------------------
 
-
+# create a list of absolute filepaths for the netcdf data to process  
 src_dir = os.path.join(case_dir,'netcdf')
 files = create_process_file_list(src_dir,products,cut_list,windows)
 
@@ -110,25 +124,12 @@ except:
 
 # initialize these with False/None until all product arrays are made for
 # the first iteration of image creation
-vgdone = False
-divdone = False
-veldone = False
-srvdone = False
-swdone = False
-ccdone = False
-refdone = False
-azdone = False
-#azsq_done = False
-#divsq_done = False
-dv_fixed = False
-az_fixed = False
 az_shape = None
 dv_shape = None
 got_orig_time = False
 
-
 # if case data defines feature_following as true
-# check for associated feature start/end lat and lon positions
+# read in start/end times and lat and lon positions
 # use them to call "calc_dlatlon_dt" function
 try:
     feature_following = this_case['feature_follow']
@@ -181,18 +182,20 @@ for filename in files:
             da_vel = da
             vel_arr = da.to_masked_array(copy=True)
             arDict[dtype] = {'ar':vel_arr,'lat':lats,'lon':lons}
-            veldone = True
+            product_status[dtype] = 'yes'
             # providing lats/lons for SRV (Storm Relative Velocity) 
             srv_lats = lats
             srv_lons = lons
+            srv_arr = calc_srv(da_vel,storm_dir,storm_speed)
+            arDict['SRV'] = {'ar':srv_arr,'lat':srv_lats,'lon':srv_lons}
+            product_status['SRV'] = 'yes'
     
         elif dtype == 'SpectrumWidth':
             print('skipping SW')
-            #da = dnew2.SpectrumWidth
-            ##print('Spec!')
-            #sw_arr = da.to_masked_array(copy=True)
-            #arDict[dtype] = {'ar':sw_arr,'lat':lats,'lon':lons}
-            #swdone = True
+            da = dnew2.SpectrumWidth
+            sw_arr = da.to_masked_array(copy=True)
+            arDict[dtype] = {'ar':sw_arr,'lat':lats,'lon':lons}
+            product_status[dtype] = 'yes'
             #pass
     
         elif dtype == 'ReflectivityQC':
@@ -200,14 +203,14 @@ for filename in files:
             ref_da = da
             ref_arr = da.to_masked_array(copy=True)
             arDict[dtype] = {'ar':ref_arr,'lat':lats,'lon':lons}
-            refdone = True
+            product_status[dtype] = 'yes'
 
         elif dtype == 'RhoHV':
             da = dnew2.RhoHV
             cc_da = da
             cc_arr = da.to_masked_array(copy=True)
             arDict[dtype] = {'ar':cc_arr,'lat':lats,'lon':lons}
-            ccdone = True
+            product_status[dtype] = 'yes'
     
         elif dtype == 'AzShear_Storm':
             da = dnew2.AzShear_Storm
@@ -216,7 +219,7 @@ for filename in files:
             az_fill[az_fill<-1] = 0
             az_shape = np.shape(az_fill)
             arDict[dtype] = {'ar':az_fill,'lat':lats,'lon':lons}
-            azdone = True
+            product_status[dtype] = 'yes'
     
             # providing lats/lons for Velocity Gradient
             vg_lats = lats
@@ -230,33 +233,24 @@ for filename in files:
             dv_fill[dv_fill<-1] = 0
             dv_shape = np.shape(dv_fill)
             arDict[dtype] = {'ar':dv_fill,'lat':lats,'lon':lons}
-            divdone = True
-    
+            product_status[dtype] = 'yes'
     
         else:
             pass
     
-        if azdone and divdone:
-            if (dv_shape == az_shape):
+
+        if 'Velocity_Gradient_Storm' in products:
+            if product_status['DivShear_Storm'] == 'yes' and product_status['AzShear_Storm'] == 'yes' and 'Velocity_Gradient_Storm' in products:
+                if (dv_shape == az_shape):
                 # Velocity Gradient equals square root of (divshear**2 + azshear**2)
                 #ar_sq = np.square(dv_fill) + np.square(az_fill)
-                vg_sq = np.square(dv_fill) + np.square(az_fill)
-                vg_arr = np.sqrt(vg_sq)
-                arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
-                vgdone = True
+                    vg_sq = np.square(dv_fill) + np.square(az_fill)
+                    vg_arr = np.sqrt(vg_sq)
+                    arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
+                    product_status['Velocity_Gradient_Storm'] = 'yes'
     
-    
-        if veldone:
-            # Create SRV from V given an input storm motion
-            srv_arr = calc_srv(da_vel,storm_dir,storm_speed)
-            arDict['SRV'] = {'ar':srv_arr,'lat':srv_lats,'lon':srv_lons}
-            srvdone = True
-        test = ['AzShear_Storm','DivShear_Storm','RhoHV','ReflectivityQC','Velocity','SRV']
-        #test = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
-        #if (divdone and veldone and swdone and refdone and azdone and vgdone):
-        #if (divdone and azdone and vgdone and csgdone and refdone and veldone and srvdone):
-        if (divdone and azdone and vgdone and refdone and veldone and srvdone):
-            fig, axes = plt.subplots(2,3,figsize=(20,12),subplot_kw={'projection': ccrs.PlateCarree()})
+        if 'no' not in product_status.values():
+            fig, axes = plt.subplots(rows,cols,figsize=(width,height),subplot_kw={'projection': ccrs.PlateCarree()})
             font = {'weight' : 'normal',
                     'size'   : 24}
             plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
@@ -269,7 +263,7 @@ for filename in files:
     
             extent,x_ticks,y_ticks = calc_new_extent(orig_time,orig_extent,this_time,dlon_dt,dlat_dt)
     
-            for y,a in zip(test,axes.ravel()):
+            for y,a in zip(products,axes.ravel()):
                     this_title = plts[y]['title']
                     a.set_extent(extent, crs=ccrs.PlateCarree())
                     a.tick_params(axis='both', labelsize=8)
@@ -325,20 +319,9 @@ for filename in files:
             print(mosaic_fname[:-4] + ' mosaic complete!')
     
             #reset these for the next image creation pass
-            vgdone = False
-            csgdone = False
-    
-            azdone = False
-            azposdone = False 
-    
-            divdone = False
-            dvnegdone = False
-    
-            veldone = False
-            srvdone = False
-            swdone = False
-            refdone = False
-            refqcdone = False
+            for p in products:
+                product_status[p] = 'no'
+
             plt.show()
             plt.close()
         else:
