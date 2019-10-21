@@ -3,11 +3,10 @@
 Creates maps from wdss-ii nedcdf files that can be saved as images
 WDSS-II information : http://www.wdssii.org/
 author: thomas.turnage@noaa.gov
-   Last updated : 23 Jun 2019
+   Last updated : 21 Oct 2019
    New features:
-            srv : function to create Storm Relative Velocity (SRV)
-     make_ticks : function to create lat/lon ticks for an extent
-        simpler way to call state shapefiles to add to maps
+   - ability to plot RhoHV (CC)
+   - ability to plot 2,3,4,6 panes
 ------------------------------------------------
 """ 
 
@@ -42,21 +41,6 @@ except:
 cut_list = this_case['cutlist']
 #products = this_case['products']
 #products = ['ReflectivityQC','Velocity','RhoHV','AzShear_Storm']
-products = ['ReflectivityQC','SRV','RhoHV']
-mosaic_size = {}
-mosaic_size[2] = {'h':6,'w':15,'rows':1,'columns':2}
-mosaic_size[3] = {'h':6,'w':17,'rows':1,'columns':3}
-mosaic_size[4] = {'h':12,'w':14,'rows':2,'columns':2}
-mosaic_size[6] = {'h':12,'w':20,'rows':2,'columns':3}
-height = mosaic_size[len(products)]['h']
-width = mosaic_size[len(products)]['w']
-rows = mosaic_size[len(products)]['rows']
-cols = mosaic_size[len(products)]['columns']
-if 'SRV' in products and 'Velocity' not in products:
-    prod_temp = products.append('Velocity')
-product_status = {}
-for p in products:
-    product_status[p] = 'no'
 
 ymin = this_case['latmin']
 ymax = this_case['latmax']
@@ -93,7 +77,7 @@ except:
     storm_speed = 30
 
 
-from my_functions import latlon_from_radar, figure_timestamp, build_html
+from my_functions import latlon_from_radar, figure_timestamp, build_html, define_mosaic_size
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from custom_cmaps import plts
 from gis_layers import shape_mini
@@ -110,6 +94,15 @@ import matplotlib.ticker as mticker
 #from datetime import datetime
 
 # ----------------------------------------------
+
+products = ['ReflectivityQC','SRV','RhoHV']
+width, height, rows, cols = define_mosaic_size(products)
+
+if 'SRV' in products and 'Velocity' not in products:
+    prod_temp = products.append('Velocity')
+product_status = {}
+for p in products:
+    product_status[p] = 'no'
 
 # create a list of absolute filepaths for the netcdf data to process  
 src_dir = os.path.join(case_dir,'netcdf')
