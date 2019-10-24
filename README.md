@@ -25,5 +25,5 @@ Note: importing case metadata from case_data.py doesn't seem to work here (becau
 
 wdss_create_figures.py
 ---------------------
-Takes the staged files and creates multi-pane images. Also leverages 'case_data.py' to control workflow.
+Takes the staged files and uses <a href="https://matplotlib.org/" target="_blank">matplotlib</a> to create multi-pane images. Also leverages 'case_data.py' to control workflow.
 Imports custom_maps.py to get the color tables needed to render the maps.
