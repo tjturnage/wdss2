@@ -10,7 +10,7 @@ Workflow generally goes with the following sequence of scripts...
 
 case_data.py
 ---------------------
-Dictionaries of case metadata that get imported into other scripts to inform what/how they should be processing.
+Dictionaries of case metadata that get imported into other scripts to inform what/how/where they should be processing.
 This is the best first step since it will ease workflow when subsequent scripts get run.
 
 wdss_create_netcdfs.py
@@ -25,5 +25,6 @@ Note: importing case metadata from case_data.py doesn't seem to work here (becau
 
 wdss_create_figures.py
 ---------------------
-Takes the staged files and uses <a href="https://matplotlib.org/" target="_blank">matplotlib</a> to create multi-pane images. Also leverages 'case_data.py' to control workflow.
+Takes the staged files and uses <a href="https://matplotlib.org/" target="_blank">matplotlib</a> to create multi-pane images. Also leverages 'case_data.py' to control workflow and to define plotting domains.
 Imports custom_maps.py to get the color tables needed to render the maps.
+Imports several functions from my_functions.py
