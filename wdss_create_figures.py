@@ -14,33 +14,53 @@ import sys
 import os
 
 try:
-    os.listdir('/var/www')
+    os.listdir('/usr')
     windows = False
     sys.path.append('/data/scripts/resources')
-    from case_data import this_case
-    case_date = this_case['date']
-    rda = this_case['rda']
-    base_gis_dir = '/data/GIS'
-
-    case_dir = os.path.join('/data/radar',case_date,rda)
-    base_dst_dir = os.path.join('/var/www/html/radar/images',case_date,rda)
-    mosaic_dir = os.path.join(base_dst_dir,'mosaic')
 except:
     windows = True
     sys.path.append('C:/data/scripts/resources')
-    from case_data import this_case
-    base_gis_dir = 'C:/data/GIS'
-    topDir = 'C:/data'
-    case_date = this_case['date']
-    rda = this_case['rda']
-    case_dir = os.path.join(topDir,case_date,rda)
-    base_dst_dir = os.path.join(topDir,'images',case_date,rda)
-    mosaic_dir = os.path.join(base_dst_dir,'mosaic') 
+
+from reference_data import set_paths
+
+data_dir,image_dir,archive_dir,gis_dir,py_call,placefile_dir = set_paths()
+from case_data import this_case
+
+event_date = this_case['date']
+
+case_dir = os.path.join(data_dir,event_date)
+rda = this_case['rda']
+radar_data_dir = os.path.join(case_dir,rda,'netcdf')
+sat_data_dir = os.path.join(case_dir,'satellite/raw')
+
+# image dirs
+
+sat_image_dir = os.path.join(image_dir,event_date,'satellite')
+radar_image_dir = os.path.join(image_dir,event_date,'radar')
+
+try:
+    extent = this_case['sat_extent']
+    #extent = [-88.4,-84.0,42.5,45.3]
+    orig_extent = extent
+except:
+    pass
+
+
+
+try:
+    pd = this_case['pandas']
+    p_ts = pd[0]
+    p_steps = pd[1]
+    p_int = pd[2]
+except:
+    pass
+shapelist = this_case['shapelist']
+#shapelist = this_case['shapelist']
 
 
 cut_list = this_case['cutlist']
 #products = this_case['products']
-#products = ['ReflectivityQC','Velocity','RhoHV','AzShear_Storm']
+products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
 
 ymin = this_case['latmin']
 ymax = this_case['latmax']
@@ -59,13 +79,13 @@ except:
 # example: 20190720053000
     
 try:
-    start_fig = this_case['start_figures']
+    start_fig = this_case['starts_figures'] # deliberate typo to skip this
 except:
-    start_fig = 0
+    start_fig = 0# 20080608200000 #0
 try:
-    end_fig = this_case['end_figures']
+    end_fig = this_case['ends_figures'] # deliberate typo to skip this
 except:
-    end_fig = 99999999999999999
+    end_fig = 9999999999999999999999#20080608210000 #99999999999999999
 
 # test if storm motion exists in case data for SRV calculation
 try:
@@ -80,7 +100,8 @@ except:
 from my_functions import latlon_from_radar, figure_timestamp, build_html, define_mosaic_size
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from custom_cmaps import plts
-from gis_layers import shape_mini
+from gis_layers import make_MI_and_surrounding_state_counties
+shape_mini = make_MI_and_surrounding_state_counties()
 from re import search
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -95,7 +116,7 @@ import matplotlib.ticker as mticker
 
 # ----------------------------------------------
 
-products = ['ReflectivityQC','SRV','RhoHV']
+
 width, height, rows, cols = define_mosaic_size(products)
 
 if 'SRV' in products and 'Velocity' not in products:
@@ -105,14 +126,11 @@ for p in products:
     product_status[p] = 'no'
 
 # create a list of absolute filepaths for the netcdf data to process  
-src_dir = os.path.join(case_dir,'netcdf')
+src_dir = os.path.join(case_dir,rda,'netcdf')
 files = create_process_file_list(src_dir,products,cut_list,windows)
 
-# ensure mosaic directory is created
-try:
-    os.makedirs(mosaic_dir)
-except:
-    pass
+# ensure radar image directory is created
+os.makedirs(radar_image_dir, exist_ok = True)
 
 
 # initialize these with False/None until all product arrays are made for
@@ -301,30 +319,30 @@ for filename in files:
     
             # name of figure file to be saved
             mosaic_fname = img_fname_tstr + '_' + newcut + '.png'
-            mosaic_cut_dir = os.path.join(mosaic_dir,newcut)      
+            radar_cut_dir = os.path.join(radar_image_dir,newcut)      
             try:
-                os.makedirs(mosaic_cut_dir)
+                os.makedirs(radar_cut_dir)
             except FileExistsError:
                 pass
     
-            image_dst_path = os.path.join(mosaic_cut_dir,mosaic_fname)
-            plt.savefig(image_dst_path,format='png')
+            image_dst_path = os.path.join(radar_cut_dir,mosaic_fname)
+            plt.savefig(image_dst_path,format='png',dpi=150, bbox_inches='tight')
             print(mosaic_fname[:-4] + ' mosaic complete!')
     
             #reset these for the next image creation pass
             for p in products:
                 product_status[p] = 'no'
-
+            plt.tight_layout()
             plt.show()
             plt.close()
         else:
             pass
   
-    for c in cut_list:
-        new_c = c.replace(".", "")
-        new_c = new_c[:-1]
-        image_dir = os.path.join(mosaic_dir,new_c)
-        try:
-            build_html(image_dir)
-        except:
-            pass
+for c in cut_list:
+    new_c = c.replace(".", "")
+    new_c = new_c[:-1]
+    image_dir = os.path.join(radar_image_dir,new_c)
+    try:
+        build_html(image_dir)
+    except:
+        pass
