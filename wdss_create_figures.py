@@ -273,7 +273,7 @@ for filename in files:
             mpl.rc('font', **font)
     
             extent,x_ticks,y_ticks = calc_new_extent(orig_time,orig_extent,this_time,dlon_dt,dlat_dt)
-    
+            a_count = 0
             for y,a in zip(products,axes.ravel()):
                     this_title = plts[y]['title']
                     a.set_extent(extent, crs=ccrs.PlateCarree())
@@ -297,25 +297,32 @@ for filename in files:
                     a.yformatter = LATITUDE_FORMATTER
                     gl = a.gridlines(color='gray',alpha=0.0,draw_labels=True) 
                     gl.xlabels_top, gl.ylabels_right = False, False
-                    gl.xlabel_style, gl.ylabel_style = {'fontsize': 9}, {'fontsize': 9}
+                    gl.xlabel_style, gl.ylabel_style = {'fontsize': 7}, {'fontsize': 7}
                     gl.xlocator = mticker.FixedLocator(x_ticks)
                     gl.ylocator = mticker.FixedLocator(y_ticks)
     
                     lon = arDict[y]['lon']
                     lat = arDict[y]['lat']
                     arr = arDict[y]['ar']
-                    title_test = ['AzShear','DivShear']
-                    #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
+                    title_test = ['AzShear','DivShear']                    #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                     cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
-                    if this_title in title_test:
-                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.4f')
+                    if y == 'AzShear_Storm':
+                        print('yep!')
+                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.1g')
                         cax.tick_params(labelsize=6)
+                        cax.set_ticks=[-0.01, 0, 0.01]
+                    elif y == 'DivShear_Storm':
+                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9,format='')
+                        cax.tick_params(labelsize=4)
                     else:
                         cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)                    
-                        cax.tick_params(labelsize=6)
+                        cax.tick_params(labelsize=4)
                     out=fig.colorbar(cs,cax=cax,**kw)
                     label=out.set_label(plts[y]['cblabel'],size=8,verticalalignment='center')
                     a.set_title(this_title)
+                    if a_count != 0:
+                        a.sharey(a[0])                        
+                
     
             # name of figure file to be saved
             mosaic_fname = img_fname_tstr + '_' + newcut + '.png'
