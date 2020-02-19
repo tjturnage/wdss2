@@ -36,7 +36,8 @@ sat_data_dir = os.path.join(case_dir,'satellite/raw')
 # image dirs
 
 sat_image_dir = os.path.join(image_dir,event_date,'satellite')
-radar_image_dir = os.path.join(image_dir,event_date,'radar')
+radar_image_dir = os.path.join(image_dir,event_date,rda)
+os.makedirs(radar_image_dir, exist_ok = True)
 
 try:
     extent = this_case['sat_extent']
@@ -61,8 +62,8 @@ shapelist = this_case['shapelist']
 cut_list = this_case['cutlist']
 cut_list = ['00.50']
 #products = this_case['products']
-#products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
-products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm']
+products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
+#products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm']
 
 ymin = this_case['latmin']
 ymax = this_case['latmax']
@@ -70,22 +71,17 @@ xmin = this_case['lonmin']
 xmax = this_case['lonmax']
 orig_extent = [xmin,xmax,ymin,ymax]
 
-# test for existence of associated shapefiles
-try:
-    shapelist = this_case['shapelist']
-except:
-    pass
 
 # test for case time range in which to create figures
 # uses integer format of YYYYMMDDHHMMSS
 # example: 20190720053000
     
 try:
-    start_fig = this_case['starts_figures'] # deliberate typo to skip this
+    start_fig = this_case['start_figures'] # deliberate typo to skip this
 except:
     start_fig = 20080608200000 #0
 try:
-    end_fig = this_case['ends_figures'] # deliberate typo to skip this
+    end_fig = this_case['end_figures'] # deliberate typo to skip this
 except:
     end_fig = 20080608200500 #99999999999999999
 
@@ -102,11 +98,11 @@ except:
 from my_functions import latlon_from_radar, figure_timestamp, build_html, define_mosaic_size
 from my_functions import calc_srv, calc_new_extent, calc_dlatlon_dt, create_process_file_list
 from custom_cmaps import plts
-from gis_layers import make_MI_and_surrounding_state_counties
-shape_mini = make_MI_and_surrounding_state_counties()
+from gis_layers import make_shapes
 from re import search
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
@@ -115,6 +111,14 @@ import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.ticker as mticker
 #from datetime import datetime
+
+
+# test for existence of associated shapefiles
+try:
+    shape_mini = make_shapes(this_case['shapelist'])
+except:
+    pass
+
 
 # ----------------------------------------------
 
@@ -261,28 +265,29 @@ for filename in files:
                     vg_arr = np.sqrt(vg_sq)
                     arDict['Velocity_Gradient_Storm'] = {'ar':vg_arr,'lat':vg_lats,'lon':vg_lons}
                     product_status['Velocity_Gradient_Storm'] = 'yes'
-    
+
+############################################################################################################
+################################   Start Plot ##############################################################    
+############################################################################################################
         if 'no' not in product_status.values():
             fig, axes = plt.subplots(rows,cols,figsize=(width,height),subplot_kw={'projection': ccrs.PlateCarree()})
-            font = {'weight' : 'normal',
-                    'size'   : 24}
-            plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees')
-            font = {'weight' : 'normal',
-                    'size'   : 12}
-            plt.titlesize : 24
+            plt.suptitle(t_str + '\n' + rda + '  ' + cut_str + '  Degrees', fontsize=14)
+
+            #plt.titlesize : 24
+            #plt.suptitlesize : 20
             plt.labelsize : 8
             plt.tick_params(labelsize=8)
-            mpl.rc('font', **font)
     
             extent,x_ticks,y_ticks = calc_new_extent(orig_time,orig_extent,this_time,dlon_dt,dlat_dt)
             a_count = 0
+            subset = ['AzShear_Storm','DivShear_Storm']
             for y,a in zip(products,axes.ravel()):
                     this_title = plts[y]['title']
                     a.set_extent(extent, crs=ccrs.PlateCarree())
                     a.tick_params(axis='both', labelsize=8)
                     for sh in shape_mini:
                         if search('survey', str(sh)):
-                            a.add_feature(shape_mini[sh], facecolor='none', edgecolor='yellow', linewidth=0.7)
+                            a.add_feature(shape_mini[sh], facecolor='none', edgecolor='yellow', linewidth=0.5)
                         else:
                             a.add_feature(shape_mini[sh], facecolor='none', edgecolor='gray', linewidth=0.5)                            
                     try:
@@ -308,28 +313,30 @@ for filename in files:
                     arr = arDict[y]['ar']
                     title_test = ['AzShear','DivShear']                    #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                     cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
-                    if y == 'AzShear_Storm':
-                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.1g')
-                        out=fig.colorbar(cs,cax=cax,ticks=[0])
+                    if y in subset:
+                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)
                         cax.tick_params(labelsize=5)
-
-                    elif y == 'DivShear_Storm':
-                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9)
-                        out=fig.colorbar(cs,cax=cax,ticks=[-0.01,0.0,0.01])
-
-                        cax.tick_params(labelsize=4)
+                        out=fig.colorbar(cs,cax=cax,**kw)
+                        out.set_ticks([-0.01,0,0.01])
+                        out.update_ticks()
+                        #tick_locator = ticker.MaxNLocator(nbins=3)
                     elif y == 'Velocity_Gradient_Storm':
-                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9)
+                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.2g')
+                        cax.tick_params(labelsize=5)
+                        out=fig.colorbar(cs,cax=cax,**kw)
+                        out.set_ticks([0,0.01,0.015])
+                        out.update_ticks()
+                        #tick_locator = ticker.MaxNLocator(nbins=4)                        
+                    else:
+                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)
+                        cax.tick_params(labelsize=5)
                         out=fig.colorbar(cs,cax=cax,**kw)
 
-                        cax.tick_params(labelsize=4)
-                    else:
-                        cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)                    
                         out=fig.colorbar(cs,cax=cax,**kw)
-                        cax.tick_params(labelsize=4)
-                    out=fig.colorbar(cs,cax=cax,**kw)
                     label=out.set_label(plts[y]['cblabel'],size=8,verticalalignment='center')
-                    a.set_title(this_title)
+                    font = {'weight' : 'normal',
+                            'size'   : 12}
+                    a.set_title(this_title, fontsize=11)
                         
                 
     
