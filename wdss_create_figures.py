@@ -59,8 +59,10 @@ shapelist = this_case['shapelist']
 
 
 cut_list = this_case['cutlist']
+cut_list = ['00.50']
 #products = this_case['products']
-products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
+#products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
+products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm']
 
 ymin = this_case['latmin']
 ymax = this_case['latmax']
@@ -81,11 +83,11 @@ except:
 try:
     start_fig = this_case['starts_figures'] # deliberate typo to skip this
 except:
-    start_fig = 0# 20080608200000 #0
+    start_fig = 20080608200000 #0
 try:
     end_fig = this_case['ends_figures'] # deliberate typo to skip this
 except:
-    end_fig = 9999999999999999999999#20080608210000 #99999999999999999
+    end_fig = 20080608200500 #99999999999999999
 
 # test if storm motion exists in case data for SRV calculation
 try:
@@ -307,21 +309,28 @@ for filename in files:
                     title_test = ['AzShear','DivShear']                    #title_test = ['AzShear','DivShear','Velocity Gradient','Spectrum Width','Conv Shear Gradient']
                     cs = a.pcolormesh(lat,lon,arr,cmap=plts[y]['cmap'],vmin=plts[y]['vmn'], vmax=plts[y]['vmx'])
                     if y == 'AzShear_Storm':
-                        print('yep!')
                         cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9,format='%.1g')
-                        cax.tick_params(labelsize=6)
-                        cax.set_ticks=[-0.01, 0, 0.01]
+                        out=fig.colorbar(cs,cax=cax,ticks=[0])
+                        cax.tick_params(labelsize=5)
+
                     elif y == 'DivShear_Storm':
-                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9,format='')
+                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9)
+                        out=fig.colorbar(cs,cax=cax,ticks=[-0.01,0.0,0.01])
+
+                        cax.tick_params(labelsize=4)
+                    elif y == 'Velocity_Gradient_Storm':
+                        cax,kw = mpl.colorbar.make_axes(a,location='right', pad=0.05,shrink=0.9)
+                        out=fig.colorbar(cs,cax=cax,**kw)
+
                         cax.tick_params(labelsize=4)
                     else:
                         cax,kw = mpl.colorbar.make_axes(a,location='right',pad=0.05,shrink=0.9)                    
+                        out=fig.colorbar(cs,cax=cax,**kw)
                         cax.tick_params(labelsize=4)
                     out=fig.colorbar(cs,cax=cax,**kw)
                     label=out.set_label(plts[y]['cblabel'],size=8,verticalalignment='center')
                     a.set_title(this_title)
-                    if a_count != 0:
-                        a.sharey(a[0])                        
+                        
                 
     
             # name of figure file to be saved
@@ -334,6 +343,7 @@ for filename in files:
     
             image_dst_path = os.path.join(radar_cut_dir,mosaic_fname)
             plt.savefig(image_dst_path,format='png',dpi=150, bbox_inches='tight')
+            print(image_dst_path)
             print(mosaic_fname[:-4] + ' mosaic complete!')
     
             #reset these for the next image creation pass
