@@ -23,14 +23,17 @@ except:
 
 from reference_data import set_paths
 
-data_dir,image_dir,archive_dir,gis_dir,py_call,placefile_dir = set_paths()
+#data_dir,image_dir,archive_dir,gis_dir,py_call,placefile_dir = set_paths()
+data_dir, image_dir, archive_dir, gis_dir, placefile_dir = set_paths()
 from case_data import this_case
-
+print(this_case)
 event_date = this_case['date']
 
-case_dir = os.path.join(data_dir,event_date)
+case_dir = os.path.join(data_dir,'events',event_date)
 rda = this_case['rda']
+
 radar_data_dir = os.path.join(case_dir,rda,'netcdf')
+print(radar_data_dir)
 sat_data_dir = os.path.join(case_dir,'satellite/raw')
 
 # image dirs
@@ -60,7 +63,7 @@ shapelist = this_case['shapelist']
 
 
 cut_list = this_case['cutlist']
-cut_list = ['00.50']
+cut_list = ['00.90','01.30','1.80']
 #products = this_case['products']
 products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
 #products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm']
@@ -77,13 +80,13 @@ orig_extent = [xmin,xmax,ymin,ymax]
 # example: 20190720053000
     
 try:
-    start_fig = this_case['start_figures'] # deliberate typo to skip this
+    start_fig = this_case['start_figuressssss'] # deliberate typo to skip this
 except:
-    start_fig = 20080608200000 #0
+    start_fig = 20220520191600 #0
 try:
-    end_fig = this_case['end_figures'] # deliberate typo to skip this
+    end_fig = this_case['end_figuressssssssss'] # deliberate typo to skip this
 except:
-    end_fig = 20080608200500 #99999999999999999
+    end_fig = 20220520203000 #99999999999999999
 
 # test if storm motion exists in case data for SRV calculation
 try:
