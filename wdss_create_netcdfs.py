@@ -15,13 +15,20 @@ Last updated: 28 May 2019
 import os
 import sys
 
+cmd1 = 'export PATH=/data/WDSS2/bin:$PATH'
+cmd2 = 'export LD_LIBRARY_PATH=/data/WDSS2/lib:$LD_LIBRARY_PATH'
+cmd3 = 'export W2_CONFIG_LOCATION=/data/w2config:/data/WDSS2/w2config'
+
+os.system(cmd1)
+os.system(cmd2)
+os.system(cmd3)
+
+windows = False
+
 try:
-    os.listdir('/usr')
-    windows = False
     sys.path.append('/data/scripts/resources')
 except:
-    windows = True
-    sys.path.append('C:/data/scripts/resources')
+    print('can not connect resources folder')
 
 from case_data import this_case
 
@@ -92,4 +99,3 @@ os.system(make_index_cmd)
 os.system(rep_index_cmd)
 
 #rm -r /localdata/data/radar/20180827/KMVX/netcdf/code_index.fam
-
