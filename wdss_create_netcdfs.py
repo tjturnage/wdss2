@@ -13,6 +13,16 @@ Last updated: 28 May 2019
 """
 
 import os
+import sys
+
+try:
+    os.listdir('/usr')
+    windows = False
+    sys.path.append('/data/scripts/resources')
+except:
+    windows = True
+    sys.path.append('C:/data/scripts/resources')
+
 from case_data import this_case
 
 case_date = this_case['date']

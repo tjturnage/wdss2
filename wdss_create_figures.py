@@ -63,7 +63,7 @@ shapelist = this_case['shapelist']
 
 
 cut_list = this_case['cutlist']
-cut_list = ['00.90','01.30','1.80']
+cut_list = ['00.50']
 #products = this_case['products']
 products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm','ReflectivityQC','Velocity','SRV']
 #products = ['AzShear_Storm','DivShear_Storm','Velocity_Gradient_Storm']
