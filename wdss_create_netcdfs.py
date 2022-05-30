@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Passes commands to WDSS-II so netcdfs from radar data can be created.
 These netcdfs are later used to create figures.
@@ -34,15 +33,15 @@ from case_data import this_case
 
 case_date = this_case['date']
 rda = this_case['rda']
-topDir = '/data/radar'
+radar_dir = '/data/radar'
 verb = ' --verbose'
 
-casePath = os.path.join(topDir,case_date,rda)
+casePath = os.path.join(radar_dir,case_date,rda)
 ncPath = os.path.join(casePath,'netcdf')
 ncIndexPath  = os.path.join(ncPath,'code_index.xml')
 comboPath = os.path.join(ncPath,'combinedIndex.xml')
 rawPath = os.path.join(casePath,'raw')
-nseIndexPath = os.path.join(topDir,case_date,'NSE','code_index.xml')
+nseIndexPath = os.path.join(radar_dir,case_date,'NSE','code_index.xml')
 #terrainPath  = terrDir + "/" + radar + ".nc.gz"
 
 # The first step is to make netcdf files from the radar files

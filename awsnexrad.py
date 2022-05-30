@@ -2,7 +2,7 @@ import nexradaws
 import pandas as pd
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     os.listdir('/usr')
@@ -21,8 +21,8 @@ dest_dir = os.path.join(base_dir,this_case['date'],this_case['rda'],'raw')
 print(dest_dir)
 os.makedirs(dest_dir, exist_ok=True)
 
-start = pd.Timestamp(this_case['start_time']).tz_localize(tz='UTC')
-end = pd.Timestamp(this_case['end_time']).tz_localize(tz='UTC')
+start = pd.Timestamp(this_case['start_time']).tz_localize(tz='UTC') - pd.Timedelta(minutes=2) 
+end = pd.Timestamp(this_case['end_time']).tz_localize(tz='UTC') + pd.Timedelta(minutes=2) 
 
 #print(start,end)
 
